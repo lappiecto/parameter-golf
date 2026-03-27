@@ -4,7 +4,7 @@
 
 We are building a tiny brain.
 
-Not metaphorically — literally. We are constructing a neural network that reads text and learns to predict what word comes next. The same fundamental mechanism that powers ChatGPT, Claude, and every other large language model. The difference is scale: those models have hundreds of billions of parameters and train on trillions of tokens. Ours must fit in 16 megabytes.
+Not metaphorically — literally. We are constructing a neural network that reads text and learns to predict what word comes next. The same fundamental mechanism that powers every large language model. The difference is scale: those models have hundreds of billions of parameters and train on trillions of tokens. Ours must fit in 16 megabytes.
 
 To put that in perspective: a single high-resolution photo on your phone is about 5MB. We're building an entire language model in the space of three photos.
 
