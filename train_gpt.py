@@ -17,6 +17,11 @@ import sys
 import time
 import uuid
 import zlib
+try:
+    import zstandard
+    _COMPRESSOR = "zstd"
+except ImportError:
+    _COMPRESSOR = "zlib"
 from pathlib import Path
 
 import numpy as np
@@ -148,8 +153,10 @@ class Muon(torch.optim.Optimizer):
                         state["momentum_buffer"] = torch.zeros_like(g)
                     buf = state["momentum_buffer"]
                     buf.mul_(momentum).add_(g)
+                    # Cautious Muon: mask out momentum that conflicts with gradient direction.
+                    buf_masked = buf * (buf * g > 0).float()
                     if nesterov:
-                        g = g.add(buf, alpha=momentum)
+                        g = g.add(buf_masked, alpha=momentum)
                     g = zeropower_via_newtonschulz5(g, steps=backend_steps)
                     # Scale correction from Muon reference implementations.
                     g *= max(1, g.size(0) / g.size(1)) ** 0.5
@@ -613,7 +620,7 @@ class MLP(nn.Module):
         self.proj._zero_init = True
 
     def forward(self, x: Tensor) -> Tensor:
-        x = torch.relu(self.fc(x))
+        x = F.leaky_relu(self.fc(x), negative_slope=0.9)
         return self.proj(x.square())
 
 
@@ -924,13 +931,23 @@ def main() -> None:
     def lr_mul(step: int, elapsed_ms: float) -> float:
         if args.warmdown_iters <= 0:
             return 1.0
+        # Iteration-based warmdown
+        iter_scale = 1.0
+        warmdown_start = max(args.iterations - args.warmdown_iters, 0)
+        if warmdown_start <= step < args.iterations:
+            iter_scale = max((args.iterations - step) / max(args.warmdown_iters, 1), 0.0)
+        elif step >= args.iterations:
+            iter_scale = 0.0
         if max_wallclock_ms is None:
-            warmdown_start = max(args.iterations - args.warmdown_iters, 0)
-            return max((args.iterations - step) / max(args.warmdown_iters, 1), 0.0) if warmdown_start <= step < args.iterations else 1.0
+            return iter_scale
+        # Wallclock-based warmdown
         step_ms = elapsed_ms / max(step, 1)
         warmdown_ms = args.warmdown_iters * step_ms
         remaining_ms = max(max_wallclock_ms - elapsed_ms, 0.0)
-        return remaining_ms / max(warmdown_ms, 1e-9) if remaining_ms <= warmdown_ms else 1.0
+        wall_scale = remaining_ms / max(warmdown_ms, 1e-9) if remaining_ms <= warmdown_ms else 1.0
+        # Use whichever warmdown is further along (lower value), so SWA triggers
+        # regardless of whether the run is iteration-limited or wallclock-limited
+        return min(iter_scale, wall_scale)
 
     # Warmup primes the compiled forward/backward/optimizer paths, then we restore the
     # initial weights/optimizer state so measured training starts from the true init.
@@ -1077,7 +1094,10 @@ def main() -> None:
     quant_buf = io.BytesIO()
     torch.save(quant_obj, quant_buf)
     quant_raw = quant_buf.getvalue()
-    quant_blob = zlib.compress(quant_raw, level=9)
+    if _COMPRESSOR == "zstd":
+        quant_blob = zstandard.ZstdCompressor(level=22).compress(quant_raw)
+    else:
+        quant_blob = zlib.compress(quant_raw, level=9)
     quant_raw_bytes = len(quant_raw)
     if master_process:
         with open("final_model.int8.ptz", "wb") as f:
@@ -1086,7 +1106,7 @@ def main() -> None:
         code_bytes = len(code.encode("utf-8"))
         ratio = quant_stats["baseline_tensor_bytes"] / max(quant_stats["int8_payload_bytes"], 1)
         log0(
-            f"Serialized model int8+zlib: {quant_file_bytes} bytes "
+            f"Serialized model int8+{_COMPRESSOR}: {quant_file_bytes} bytes "
             f"(payload:{quant_stats['int8_payload_bytes']} raw_torch:{quant_raw_bytes} payload_ratio:{ratio:.2f}x)"
         )
         log0(f"Total submission size int8+zlib: {quant_file_bytes + code_bytes} bytes")
@@ -1095,7 +1115,11 @@ def main() -> None:
         dist.barrier()
     with open("final_model.int8.ptz", "rb") as f:
         quant_blob_disk = f.read()
-    quant_state = torch.load(io.BytesIO(zlib.decompress(quant_blob_disk)), map_location="cpu")
+    if _COMPRESSOR == "zstd":
+        quant_decompressed = zstandard.ZstdDecompressor().decompress(quant_blob_disk)
+    else:
+        quant_decompressed = zlib.decompress(quant_blob_disk)
+    quant_state = torch.load(io.BytesIO(quant_decompressed), map_location="cpu")
     base_model.load_state_dict(dequantize_state_dict_int8(quant_state), strict=True)
     torch.cuda.synchronize()
     t_qeval = time.perf_counter()
