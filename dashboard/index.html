@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parameter Golf Lab</title>
+<style>
+  :root {
+    --bg: #0a0e17; --bg2: #111827; --bg3: #1a2332;
+    --border: #2a3444; --text: #e2e8f0; --muted: #8899aa;
+    --green: #10b981; --blue: #3b82f6; --purple: #8b5cf6;
+    --orange: #f59e0b; --red: #ef4444; --cyan: #06b6d4;
+    --gold: #fbbf24; --tour-glow: rgba(251, 191, 36, 0.25);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #0f172a, #1e1b4b);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header h1 span { color: var(--green); }
+  .header .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .header .sota {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 16px; text-align: right;
+  }
+  .header .sota .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .header .sota .value { font-size: 24px; font-weight: 700; color: var(--gold); }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 400px 1fr 360px; height: calc(100vh - 72px); }
+
+  /* Panels */
+  .panel { border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; }
+  .panel:last-child { border-right: none; }
+  .panel-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); margin-bottom: 4px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-desc {
+    font-size: 11px; color: var(--muted); line-height: 1.6; margin-bottom: 12px;
+  }
+
+  /* Control Groups */
+  .control-group {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .control-group .group-title {
+    font-size: 12px; font-weight: 600; color: var(--cyan); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .control-group .group-desc {
+    font-size: 10px; color: var(--muted); line-height: 1.5; margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+
+  /* Slider Controls */
+  .control { margin-bottom: 14px; }
+  .control:last-child { margin-bottom: 0; }
+  .control .control-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+  }
+  .control label { font-size: 11px; color: var(--text); font-weight: 600; }
+  .control .value-display {
+    font-size: 13px; font-weight: 700; color: var(--green);
+    font-variant-numeric: tabular-nums;
+  }
+  .control input[type="range"] {
+    width: 100%; accent-color: var(--blue); height: 4px; margin: 6px 0;
+  }
+  .control .control-desc {
+    font-size: 10px; color: var(--muted); line-height: 1.5; margin-top: 2px;
+  }
+  .control .control-impact {
+    font-size: 10px; color: var(--green); margin-top: 3px; font-weight: 600;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 20px; border: none; border-radius: 8px;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-run {
+    background: linear-gradient(135deg, var(--green), #059669);
+    color: white; width: 100%; margin-top: 12px; font-size: 15px; padding: 14px;
+  }
+  .btn-run:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-run:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-stop { background: var(--red); color: white; width: 100%; margin-top: 8px; }
+  .btn-preset {
+    background: var(--bg3); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 10px; font-size: 11px; border-radius: 6px;
+  }
+  .btn-preset:hover { border-color: var(--blue); }
+  .btn-preset.active { border-color: var(--green); color: var(--green); }
+  .btn-ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    padding: 4px 8px; font-size: 10px; border-radius: 4px; cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text); }
+
+  /* Presets */
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
+  /* Experiment Name */
+  .exp-name-input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 12px; font-size: 13px; width: 100%;
+    font-family: inherit; margin-bottom: 8px;
+  }
+  .exp-name-input:focus { outline: none; border-color: var(--blue); }
+
+  /* Centre Panel */
+  .centre { padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+  /* Section with description */
+  .section-header { margin-bottom: 8px; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 4px; }
+  .section-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* Stats Cards */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px;
+  }
+  .stat-card .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat-card .stat-value { font-size: 22px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat-card .stat-desc { font-size: 9px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .stat-card.highlight .stat-value { color: var(--gold); }
+
+  /* Size Bar */
+  .size-bar {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+  }
+  .size-bar .bar-track {
+    background: var(--bg); border-radius: 4px; height: 24px; position: relative;
+    overflow: hidden; margin-top: 8px;
+  }
+  .size-bar .bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.3s, background 0.3s;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 8px;
+    font-size: 11px; font-weight: 600;
+  }
+
+  /* Log */
+  .log-panel {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; min-height: 160px; max-height: 360px; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .log-output {
+    font-size: 11px; line-height: 1.6; color: var(--muted);
+    overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    flex: 1; min-height: 0;
+  }
+
+  /* Validation progress bar */
+  .val-progress-bar {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; display: none;
+  }
+  .val-progress-bar.active { display: block; }
+  .val-progress-bar .vp-track {
+    background: var(--bg); border-radius: 4px; height: 12px; overflow: hidden; margin-top: 6px;
+  }
+  .val-progress-bar .vp-fill {
+    height: 100%; background: var(--purple); border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .log-output .log-step { color: var(--blue); }
+  .log-output .log-val { color: var(--green); font-weight: 600; }
+  .log-output .log-final { color: var(--gold); font-weight: 700; }
+
+  /* Chart */
+  .chart-container {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; min-height: 340px; overflow: hidden;
+  }
+  .chart-canvas { width: 100%; height: 280px; display: block; overflow: hidden; }
+
+  /* Your Score Card */
+  .your-score {
+    background: linear-gradient(135deg, #064e3b, #0f172a);
+    border: 1px solid var(--green); border-radius: 8px;
+    padding: 14px; margin-bottom: 12px; text-align: center;
+  }
+  .your-score .ys-label { font-size: 10px; color: var(--green); text-transform: uppercase; letter-spacing: 1px; }
+  .your-score .ys-value { font-size: 32px; font-weight: 700; color: var(--green); margin: 4px 0; font-variant-numeric: tabular-nums; }
+  .your-score .ys-rank { font-size: 11px; color: var(--muted); }
+  .your-score .ys-delta { font-size: 11px; margin-top: 4px; }
+  .your-score .ys-delta.positive { color: var(--green); }
+  .your-score .ys-delta.negative { color: var(--orange); }
+
+  /* Global Board */
+  .global-board {
+    background: linear-gradient(135deg, #1e1b4b, #0f172a);
+    border: 1px solid #4338ca; border-radius: 8px; padding: 12px; margin-bottom: 12px;
+  }
+  .global-board .gb-title {
+    font-size: 10px; color: var(--purple); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .global-entry {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 11px; border-bottom: 1px solid rgba(99,102,241,0.15);
+  }
+  .global-entry:last-child { border-bottom: none; }
+  .global-entry .ge-name { color: var(--muted); }
+  .global-entry .ge-score { color: var(--purple); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .global-entry.ge-top .ge-score { color: var(--gold); }
+  .global-entry.ge-you { background: rgba(16, 185, 129, 0.1); border-radius: 4px; padding: 4px 6px; }
+  .global-entry.ge-you .ge-name { color: var(--green); font-weight: 600; }
+  .global-entry.ge-you .ge-score { color: var(--green); }
+
+  /* Leaderboard Entries */
+  .leaderboard-entry {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s;
+  }
+  .leaderboard-entry:hover { border-color: var(--blue); }
+  .leaderboard-entry .rank { font-size: 18px; font-weight: 700; color: var(--gold); display: inline-block; width: 28px; }
+  .leaderboard-entry .entry-name { font-size: 12px; font-weight: 600; }
+  .leaderboard-entry .entry-bpb { font-size: 16px; font-weight: 700; color: var(--green); float: right; font-variant-numeric: tabular-nums; }
+  .leaderboard-entry .entry-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .leaderboard-entry .entry-config {
+    font-size: 10px; color: var(--muted); margin-top: 6px;
+    display: none; background: var(--bg); border-radius: 4px; padding: 8px;
+  }
+  .leaderboard-entry.expanded .entry-config { display: block; }
+
+  /* ===== TOUR OVERLAY ===== */
+  .tour-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9998;
+    display: none;
+  }
+  .tour-overlay.active { display: block; }
+
+  .tour-highlight {
+    position: absolute; border: 2px solid var(--gold); border-radius: 10px;
+    box-shadow: 0 0 0 4000px rgba(0,0,0,0.65), 0 0 30px var(--tour-glow), inset 0 0 20px var(--tour-glow);
+    z-index: 9999; pointer-events: none; transition: all 0.4s ease;
+  }
+
+  .tour-card {
+    position: fixed; z-index: 10000; background: var(--bg2);
+    border: 1px solid var(--gold); border-radius: 12px;
+    padding: 20px; max-width: 380px; min-width: 300px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
+  }
+  .tour-card .tour-step-label {
+    font-size: 10px; color: var(--gold); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .tour-card .tour-title {
+    font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+  }
+  .tour-card .tour-body {
+    font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 16px;
+  }
+  .tour-card .tour-actions {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .tour-card .tour-dots {
+    display: flex; gap: 6px;
+  }
+  .tour-card .tour-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--border);
+  }
+  .tour-card .tour-dot.active { background: var(--gold); }
+  .tour-card .tour-dot.done { background: var(--green); }
+  .tour-btn {
+    background: linear-gradient(135deg, var(--gold), #d97706);
+    color: #0a0e17; border: none; border-radius: 6px;
+    padding: 8px 18px; font-family: inherit; font-size: 12px;
+    font-weight: 700; cursor: pointer; transition: all 0.15s;
+  }
+  .tour-btn:hover { filter: brightness(1.1); }
+  .tour-btn-skip {
+    background: none; border: none; color: var(--muted);
+    font-family: inherit; font-size: 11px; cursor: pointer;
+  }
+  .tour-btn-skip:hover { color: var(--text); }
+
+  /* Start Tour Button */
+  .btn-tour {
+    background: var(--bg3); color: var(--gold); border: 1px solid var(--gold);
+    padding: 6px 12px; font-size: 11px; border-radius: 6px;
+    font-family: inherit; cursor: pointer; margin-left: 12px;
+  }
+  .btn-tour:hover { background: rgba(251,191,36,0.1); }
+
+  /* Advisor */
+  .advisor-panel {
+    background: linear-gradient(135deg, #1a1c2e, #0f172a);
+    border: 1px solid #4338ca; border-radius: 10px;
+    padding: 16px;
+  }
+  .advisor-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .advisor-title { font-size: 13px; font-weight: 700; color: var(--purple); }
+  .advisor-subtitle { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .advisor-analysis {
+    background: rgba(99,102,241,0.08); border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 10px; font-size: 11px; line-height: 1.6;
+  }
+  .advisor-analysis .aa-title { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .advisor-analysis .aa-body { color: var(--muted); }
+
+  .suggestion-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; margin-bottom: 8px; transition: border-color 0.15s;
+  }
+  .suggestion-card:hover { border-color: var(--purple); }
+  .suggestion-card .sg-header {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;
+  }
+  .suggestion-card .sg-rank {
+    background: var(--purple); color: white; font-size: 10px; font-weight: 700;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .suggestion-card .sg-title { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; margin-left: 8px; }
+  .suggestion-card .sg-impact {
+    font-size: 10px; font-weight: 600; color: var(--green);
+    background: rgba(16,185,129,0.1); padding: 2px 8px; border-radius: 4px; flex-shrink: 0;
+  }
+  .suggestion-card .sg-body { font-size: 10px; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+  .suggestion-card .sg-tried { font-size: 9px; color: var(--orange); margin-bottom: 6px; }
+  .suggestion-card .sg-apply {
+    background: var(--purple); color: white; border: none; border-radius: 5px;
+    padding: 5px 12px; font-family: inherit; font-size: 10px; font-weight: 600;
+    cursor: pointer; transition: filter 0.15s;
+  }
+  .suggestion-card .sg-apply:hover { filter: brightness(1.2); }
+
+  /* Pulse highlight for applied suggestions */
+  @keyframes pulse-glow {
+    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.6); background: rgba(139, 92, 246, 0.15); }
+    40% { box-shadow: 0 0 16px 4px rgba(139, 92, 246, 0.3); background: rgba(139, 92, 246, 0.12); }
+    100% { box-shadow: 0 0 0 0 transparent; background: transparent; }
+  }
+  .control.pulse-highlight {
+    animation: pulse-glow 2s ease-out;
+    border-radius: 6px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="display:flex; align-items:center;">
+    <div>
+      <h1><span>&#9971;</span> Parameter Golf Lab</h1>
+      <div class="subtitle">Train the best language model under 16MB &bull; Lower BPB wins &bull; Compete globally</div>
+    </div>
+    <button class="btn-tour" onclick="startTour()">&#127891; Take the Tour</button>
+  </div>
+  <div class="sota" id="tour-target-header">
+    <div class="label">Global SOTA</div>
+    <div class="value">1.1428</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- ===== LEFT: Controls ===== -->
+  <div class="panel" id="controls-panel">
+    <div class="panel-title">Experiment Controls</div>
+    <div class="panel-desc">This is your workbench. Each slider controls a different aspect of the model you're training. Tweak these values, then hit Launch to train a model and see how it scores. Think of it like tuning a racing car — every setting affects performance.</div>
+
+    <div class="presets" id="tour-target-presets">
+      <button class="btn btn-preset active" onclick="loadPreset('baseline', this)">Baseline</button>
+      <button class="btn btn-preset" onclick="loadPreset('fast_smoke', this)">Quick Smoke</button>
+      <button class="btn btn-preset" onclick="loadPreset('wider_mlp', this)">3x MLP</button>
+      <button class="btn btn-preset" onclick="loadPreset('deep_10l', this)">10 Layers</button>
+      <button class="btn btn-preset" onclick="loadPreset('long_ctx', this)">Long Context</button>
+      <button class="btn btn-preset" onclick="loadPreset('aggressive', this)">Aggressive</button>
+    </div>
+
+    <input type="text" class="exp-name-input" id="exp-name" value="baseline" placeholder="Name this experiment...">
+
+    <!-- ===== Architecture ===== -->
+    <div class="control-group" id="tour-target-architecture">
+      <div class="group-title"><span class="icon">&#9881;</span> Architecture</div>
+      <div class="group-desc">These settings define the shape and size of your neural network. A transformer is made of stacked layers, each containing attention (which finds patterns between tokens) and an MLP (which processes those patterns). More layers and wider dimensions mean a smarter model — but it also gets bigger, and you only have 16MB to work with.</div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Layers</label>
+          <div class="value-display" id="val-num_layers">9</div>
+        </div>
+        <input type="range" min="4" max="16" step="1" value="9" data-key="num_layers" oninput="updateSlider(this)">
+        <div class="control-desc">How many transformer blocks are stacked on top of each other. Each layer gives the model another chance to refine its understanding. More layers = deeper reasoning, but each one adds about 2.6 million parameters (at dim=512). The baseline uses 9, the competition leaders use 10-11.</div>
+        <div class="control-impact">Leaderboard impact: going from 9 to 10 layers gained ~0.003 BPB</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Model Dimension</label>
+          <div class="value-display" id="val-model_dim">512</div>
+        </div>
+        <input type="range" min="128" max="1024" step="64" value="512" data-key="model_dim" oninput="updateSlider(this)">
+        <div class="control-desc">The width of every hidden representation inside the model. Think of it as the "bandwidth" of information flowing through each layer. 512 means every token is represented as a vector of 512 numbers. Doubling this roughly quadruples the total parameter count, so 512 is the sweet spot for fitting under 16MB.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Attention Heads</label>
+          <div class="value-display" id="val-num_heads">8</div>
+        </div>
+        <input type="range" min="2" max="16" step="2" value="8" data-key="num_heads" oninput="updateSlider(this)">
+        <div class="control-desc">Attention is how the model decides which other tokens in the sequence matter for predicting the next one. Multiple heads let it look for different kinds of relationships simultaneously — one head might track grammar, another might track topic, etc. 8 heads at dim=512 gives each head 64 dimensions to work with.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>KV Heads (GQA)</label>
+          <div class="value-display" id="val-num_kv_heads">4</div>
+        </div>
+        <input type="range" min="1" max="8" step="1" value="4" data-key="num_kv_heads" oninput="updateSlider(this)">
+        <div class="control-desc">Grouped Query Attention is a trick to save parameters. Instead of giving every attention head its own Key and Value projections, multiple heads share them. With 8 query heads and 4 KV heads, each KV pair is shared by 2 query heads. This saves ~25% of attention parameters with minimal quality loss.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>MLP Multiplier</label>
+          <div class="value-display" id="val-mlp_mult">2</div>
+        </div>
+        <input type="range" min="1" max="4" step="1" value="2" data-key="mlp_mult" oninput="updateSlider(this)">
+        <div class="control-desc">The MLP (feed-forward network) in each layer expands the representation to a wider hidden dimension, applies a nonlinearity, then compresses it back. This multiplier controls how wide that expansion is. The MLP is where most of the model's "knowledge" is stored — wider = more capacity. Every competition leader uses 3x.</div>
+        <div class="control-impact">Leaderboard impact: going from 2x to 3x MLP gained ~0.01 BPB</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Vocabulary Size</label>
+          <div class="value-display" id="val-vocab_size">1024</div>
+        </div>
+        <input type="range" min="256" max="8192" step="256" value="1024" data-key="vocab_size" oninput="updateSlider(this)">
+        <div class="control-desc">How many unique tokens the model knows. A 1024-token vocabulary is tiny by LLM standards (GPT-4 uses ~100k), but it means the embedding table only takes vocab_size x model_dim parameters. Larger vocab = more efficient tokenisation (fewer tokens per sentence) but costs more parameters in the embedding. Changing this requires re-tokenising the training data, so it's an advanced move.</div>
+      </div>
+    </div>
+
+    <!-- ===== Training ===== -->
+    <div class="control-group" id="tour-target-training">
+      <div class="group-title"><span class="icon">&#9889;</span> Training</div>
+      <div class="group-desc">These control how the model learns. Training works by showing the model text, asking it to predict the next token, measuring how wrong it was (the loss), and then adjusting its weights to be less wrong next time. Each "iteration" is one such update step. More iterations = more learning, up to a point where the model starts memorising instead of generalising.</div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Iterations</label>
+          <div class="value-display" id="val-iterations">200</div>
+        </div>
+        <input type="range" min="50" max="20000" step="50" value="200" data-key="iterations" oninput="updateSlider(this)">
+        <div class="control-desc">Number of weight-update steps. The competition runs ~20,000 iterations on H100 GPUs. Locally on your M4 Max, keep this low (200-500) for quick experiments. You won't match H100 quality locally, but you can see which settings trend in the right direction.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Sequence Length</label>
+          <div class="value-display" id="val-train_seq_len">1024</div>
+        </div>
+        <input type="range" min="256" max="4096" step="256" value="1024" data-key="train_seq_len" oninput="updateSlider(this)">
+        <div class="control-desc">How many tokens the model sees at once during training. Longer sequences let the model learn longer-range patterns (like how a paragraph connects to its introduction). This was one of the easiest wins on the leaderboard — going from 1024 to 2048 tokens gave a significant improvement because the model could use more context when predicting.</div>
+        <div class="control-impact">Leaderboard impact: 1024 to 2048 gained ~0.02 BPB, 4096 added another ~0.005</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Batch Tokens</label>
+          <div class="value-display" id="val-train_batch_tokens">8192</div>
+        </div>
+        <input type="range" min="4096" max="524288" step="4096" value="8192" data-key="train_batch_tokens" oninput="updateSlider(this)">
+        <div class="control-desc">Total tokens processed per training step across all gradient accumulation steps. Larger batches give more stable gradient estimates (less noise in the learning signal), but require more memory. The H100 default is 524,288 tokens per step. Locally, use 8k-32k depending on your available memory.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Warmup Steps</label>
+          <div class="value-display" id="val-warmup_steps">20</div>
+        </div>
+        <input type="range" min="0" max="100" step="5" value="20" data-key="warmup_steps" oninput="updateSlider(this)">
+        <div class="control-desc">The learning rate starts at zero and linearly ramps up over this many steps. This prevents the randomly-initialised model from making huge, destructive weight updates in the first few steps. 20 steps is a good default — enough to stabilise without wasting training time.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Warmdown Iterations</label>
+          <div class="value-display" id="val-warmdown_iters">1200</div>
+        </div>
+        <input type="range" min="0" max="5000" step="100" value="1200" data-key="warmdown_iters" oninput="updateSlider(this)">
+        <div class="control-desc">Near the end of training, the learning rate gradually drops to zero over this many iterations. This lets the model "settle" into a good solution instead of bouncing around. Think of it like slowing down as you approach a parking spot. Competition leaders use 3000 warmdown iterations for smoother convergence.</div>
+        <div class="control-impact">Leaders use warmdown=3000 for better final convergence</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Gradient Clip Norm</label>
+          <div class="value-display" id="val-grad_clip_norm">0</div>
+        </div>
+        <input type="range" min="0" max="1" step="0.05" value="0" data-key="grad_clip_norm" oninput="updateSlider(this)">
+        <div class="control-desc">Caps the maximum size of gradient updates. If a training example produces an unusually large gradient, clipping prevents it from destabilising the model. Set to 0 to disable. The current leader uses 0.3. This is a safety net — not always needed but can help with stability.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Max Wallclock (seconds)</label>
+          <div class="value-display" id="val-max_wallclock_seconds">600</div>
+        </div>
+        <input type="range" min="60" max="3600" step="60" value="600" data-key="max_wallclock_seconds" oninput="updateSlider(this)">
+        <div class="control-desc">Hard time limit for training. The competition enforces 600 seconds (10 minutes) on 8xH100s. Locally you can set this higher if you want longer runs, or lower for quick iterations. Training stops when either this limit or the iteration count is reached, whichever comes first.</div>
+      </div>
+    </div>
+
+    <!-- ===== Optimiser ===== -->
+    <div class="control-group" id="tour-target-optimiser">
+      <div class="group-title"><span class="icon">&#128200;</span> Optimiser</div>
+      <div class="group-desc">The optimiser is the algorithm that actually updates the model's weights based on the gradients. This model uses two different optimisers: Muon for the big matrix weights (attention and MLP layers) and Adam for everything else (embeddings and small scalars). Muon is special — it orthogonalises gradients before applying them, which helps the model learn more efficiently in this constrained setting.</div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Embedding Learning Rate</label>
+          <div class="value-display" id="val-tied_embed_lr">0.05</div>
+        </div>
+        <input type="range" min="0.001" max="0.2" step="0.001" value="0.05" data-key="tied_embed_lr" oninput="updateSlider(this)">
+        <div class="control-desc">Learning rate for the token embedding table (used by Adam, not Muon). The embedding converts token IDs into vectors the model can process. Because the embeddings are tied (shared between input and output), this single table does double duty, so its learning rate needs careful tuning.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Matrix LR (Muon)</label>
+          <div class="value-display" id="val-matrix_lr">0.04</div>
+        </div>
+        <input type="range" min="0.005" max="0.1" step="0.001" value="0.04" data-key="matrix_lr" oninput="updateSlider(this)">
+        <div class="control-desc">Learning rate for all the big weight matrices (Q, K, V, output projections, MLP layers), optimised by Muon. This is the most important learning rate because these matrices contain most of the model's parameters. Competition leaders dropped this from 0.04 to 0.02 for more stable training.</div>
+        <div class="control-impact">Leaders use matrix_lr=0.02 for better stability</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Scalar LR</label>
+          <div class="value-display" id="val-scalar_lr">0.04</div>
+        </div>
+        <input type="range" min="0.005" max="0.1" step="0.001" value="0.04" data-key="scalar_lr" oninput="updateSlider(this)">
+        <div class="control-desc">Learning rate for small scalar/vector parameters like layer scales, attention gains, and residual mixing weights. These are tiny but important — they control how much each layer contributes to the final output.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Muon Momentum</label>
+          <div class="value-display" id="val-muon_momentum">0.95</div>
+        </div>
+        <input type="range" min="0.8" max="0.999" step="0.001" value="0.95" data-key="muon_momentum" oninput="updateSlider(this)">
+        <div class="control-desc">How much Muon remembers from previous gradient updates. Higher momentum means smoother, more consistent updates because the optimiser carries more "memory" of past gradients. This prevents the model from zigzagging during training. Every leader bumped this from 0.95 to 0.99 — one of the easiest and most impactful tuning changes.</div>
+        <div class="control-impact">Leaderboard: 0.95 to 0.99 gave measurable BPB improvement</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>QK Gain Init</label>
+          <div class="value-display" id="val-qk_gain_init">1.5</div>
+        </div>
+        <input type="range" min="0.5" max="3.0" step="0.1" value="1.5" data-key="qk_gain_init" oninput="updateSlider(this)">
+        <div class="control-desc">Initial scaling factor for the query vectors in attention. This controls how "sharp" the attention distribution starts out. Higher values make attention more focused from the start, lower values make it more diffuse. The learnable gain per head allows the model to adjust this during training.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Logit Softcap</label>
+          <div class="value-display" id="val-logit_softcap">30</div>
+        </div>
+        <input type="range" min="10" max="60" step="1" value="30" data-key="logit_softcap" oninput="updateSlider(this)">
+        <div class="control-desc">Caps the maximum logit value using tanh(x/cap)*cap. This prevents the model from becoming overconfident in its predictions, which can cause training instability. 30 is a sensible default — low enough to regularise, high enough not to hurt expressiveness.</div>
+      </div>
+    </div>
+
+    <!-- ===== Advanced Techniques ===== -->
+    <div class="control-group" id="tour-target-advanced" style="border-color:#4338ca;">
+      <div class="group-title" style="color:var(--purple);"><span class="icon">&#127881;</span> Advanced Techniques (SOTA)</div>
+      <div class="group-desc">These are the techniques used by the competition leaders that go beyond basic hyperparameter tuning. SmearGate and BigramHash are architecture changes that give the model bigram-level awareness before it enters the transformer layers. Orthogonal init and weight decay are training improvements. Together they're worth ~0.03-0.05 BPB.</div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>SmearGate</label>
+          <div class="value-display" id="val-use_smeargate">1</div>
+        </div>
+        <input type="range" min="0" max="1" step="1" value="1" data-key="use_smeargate" oninput="updateSlider(this)">
+        <div class="control-desc">Blends each token's embedding with the previous token's embedding using a learned per-dimension gate. Initialised at 50/50 blend (sigmoid(0) = 0.5). Gives the model bigram-level context before the first transformer layer — like a cheap lookahead that helps disambiguate tokens. Present in every top-5 submission. 1 = on, 0 = off.</div>
+        <div class="control-impact">Present in all top-5 submissions</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>BigramHash Buckets</label>
+          <div class="value-display" id="val-bigram_vocab_size">4096</div>
+        </div>
+        <input type="range" min="0" max="16384" step="1024" value="4096" data-key="bigram_vocab_size" oninput="updateSlider(this)">
+        <div class="control-desc">Hashes consecutive token pairs into a lookup table with this many buckets. Each pair maps to a learned 128-dim embedding that's added to the token representation. More buckets = fewer hash collisions = more distinct pair representations. The leader uses 10240. Set to 0 to disable entirely.</div>
+        <div class="control-impact">Leader uses 10240; going from 4096 to 10240 gained ~0.002 BPB</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>BigramHash Dim</label>
+          <div class="value-display" id="val-bigram_dim">128</div>
+        </div>
+        <input type="range" min="32" max="256" step="32" value="128" data-key="bigram_dim" oninput="updateSlider(this)">
+        <div class="control-desc">Embedding dimension for the bigram hash table. These get projected to the model dimension (512) via a learned linear layer. 128 is what all leaders use — large enough to be expressive, small enough to not dominate the parameter budget.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Muon Weight Decay</label>
+          <div class="value-display" id="val-muon_weight_decay">0.04</div>
+        </div>
+        <input type="range" min="0" max="0.1" step="0.005" value="0.04" data-key="muon_weight_decay" oninput="updateSlider(this)">
+        <div class="control-desc">Decoupled weight decay applied to all Muon-optimised matrix parameters. Shrinks weights toward zero each step, which keeps the weight distribution tight. This helps both generalisation (prevents overfitting) and post-training quantisation (tighter distributions compress better into int8/int6). The leader uses 0.04.</div>
+        <div class="control-impact">Leader uses 0.04; helps both quality and compression</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Quantise MLP (bits)</label>
+          <div class="value-display" id="val-quant_bits_mlp">6</div>
+        </div>
+        <input type="range" min="4" max="8" step="1" value="6" data-key="quant_bits_mlp" oninput="updateSlider(this)">
+        <div class="control-desc">Bit depth for MLP weight quantisation after training. Int8 (127 levels) is the safest. Int6 (31 levels) compresses ~1.5x better. Int5 (15 levels) compresses ~1.9x better but loses more precision. MLP weights tolerate aggressive quantisation because relu² creates sparse activations — most weights barely matter. The SOTA leader uses int5 for MLPs, freeing enough bytes to fit an extra layer.</div>
+        <div class="control-impact">Int5 MLP saves ~1.86MB vs int6, funding a 10th layer</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Quantise Attention (bits)</label>
+          <div class="value-display" id="val-quant_bits_attn">6</div>
+        </div>
+        <input type="range" min="4" max="8" step="1" value="6" data-key="quant_bits_attn" oninput="updateSlider(this)">
+        <div class="control-desc">Bit depth for attention weight quantisation. Attention weights are more precision-sensitive than MLP weights because they control the sharp attention patterns that determine which tokens attend to which. The SOTA leader uses int6 here — aggressive enough to save space, precise enough to preserve attention quality.</div>
+        <div class="control-impact">Leader uses int6 for attention weights</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Sliding Window Eval Stride</label>
+          <div class="value-display" id="val-eval_stride">64</div>
+        </div>
+        <input type="range" min="0" max="512" step="32" value="64" data-key="eval_stride" oninput="updateSlider(this)">
+        <div class="control-desc">During final evaluation, instead of chopping the validation set into independent chunks, we slide a window forward by this many tokens. Each scored token gets (seq_len - stride) tokens of context. With stride=64 and seq_len=2048, that's 1984 tokens of context per scored position vs ~1024 average without sliding. This is a FREE BPB improvement — no retraining needed. Set to 0 to disable.</div>
+        <div class="control-impact">Worth ~0.03 BPB for free (eval-only, no retraining)</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>SWA Enabled</label>
+          <div class="value-display" id="val-swa_enabled">1</div>
+        </div>
+        <input type="range" min="0" max="1" step="1" value="1" data-key="swa_enabled" oninput="updateSlider(this)">
+        <div class="control-desc">Stochastic Weight Averaging: during the last portion of warmdown, snapshot the model every N steps, then average all snapshots before final evaluation. The averaged model is almost always better than any individual checkpoint because it smooths out noise from individual training steps. Like asking 20 versions of the model for consensus. 1 = on, 0 = off.</div>
+        <div class="control-impact">Worth ~0.005-0.01 BPB</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>SWA Start Fraction</label>
+          <div class="value-display" id="val-swa_start_frac">0.4</div>
+        </div>
+        <input type="range" min="0.1" max="0.9" step="0.05" value="0.4" data-key="swa_start_frac" oninput="updateSlider(this)">
+        <div class="control-desc">When to start collecting SWA checkpoints, as a fraction of the warmdown LR multiplier. 0.4 means start collecting when the learning rate has decayed to 40% of peak. Lower values = more checkpoints collected = smoother average but includes earlier, less-converged snapshots. The leader uses 0.4.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>SWA Every N Steps</label>
+          <div class="value-display" id="val-swa_every">50</div>
+        </div>
+        <input type="range" min="10" max="200" step="10" value="50" data-key="swa_every" oninput="updateSlider(this)">
+        <div class="control-desc">How often to collect a checkpoint during the SWA window. Every 50 steps is what the leader uses. Smaller values = more checkpoints = smoother average but more memory usage.</div>
+      </div>
+    </div>
+
+    <!-- ===== Evaluation ===== -->
+    <div class="control-group" id="tour-target-eval">
+      <div class="group-title"><span class="icon">&#128202;</span> Evaluation</div>
+      <div class="group-desc">These control how and when the model is tested against the validation set during training. The validation set is a held-out portion of text the model never sees during training. Evaluating on it tells us how well the model generalises to new text — which is ultimately what the competition scores.</div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Val Batch Size</label>
+          <div class="value-display" id="val-val_batch_size">8192</div>
+        </div>
+        <input type="range" min="4096" max="524288" step="4096" value="8192" data-key="val_batch_size" oninput="updateSlider(this)">
+        <div class="control-desc">How many tokens to evaluate at once during validation. Larger values are more efficient but use more memory. The full validation set is always evaluated — this just controls the batch size for processing it.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Validate Every N Steps</label>
+          <div class="value-display" id="val-val_loss_every">0</div>
+        </div>
+        <input type="range" min="0" max="2000" step="100" value="0" data-key="val_loss_every" oninput="updateSlider(this)">
+        <div class="control-desc">Run validation every N training steps. Set to 0 to only validate at the end (faster for quick experiments). Set to e.g. 200 if you want to watch the BPB improve over time during training. Each validation run takes a while, especially on MLX, so don't set this too low.</div>
+      </div>
+
+      <div class="control">
+        <div class="control-header">
+          <label>Log Every N Steps</label>
+          <div class="value-display" id="val-train_log_every">200</div>
+        </div>
+        <input type="range" min="10" max="1000" step="10" value="200" data-key="train_log_every" oninput="updateSlider(this)">
+        <div class="control-desc">Print a training loss summary line every N steps. More frequent logging gives you finer-grained visibility into how training is progressing, but very frequent logging can slightly slow things down.</div>
+      </div>
+    </div>
+
+    <button class="btn btn-run" id="run-btn" onclick="startExperiment()">&#9654; Launch Experiment</button>
+    <button class="btn btn-stop" id="stop-btn" style="display:none" onclick="stopExperiment()">&#9632; Stop Run</button>
+  </div>
+
+  <!-- ===== CENTRE: Live View ===== -->
+  <div class="centre" id="centre-panel">
+
+    <div class="section-header">
+      <div class="section-title">Live Metrics</div>
+      <div class="section-desc">These update in real time while an experiment is running. They show you how the model is performing right now.</div>
+    </div>
+
+    <div class="stats-grid" id="tour-target-stats">
+      <div class="stat-card highlight">
+        <div class="stat-label">Best BPB</div>
+        <div class="stat-value" id="stat-best-bpb">--</div>
+        <div class="stat-desc">Your best Bits Per Byte score across all experiments. This is the competition metric — lower is better. The global leader is at 1.1428.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Current Loss</div>
+        <div class="stat-value" id="stat-loss">--</div>
+        <div class="stat-desc">The training loss at the latest logged step. This measures how well the model predicts the next token on training data. It should decrease over time.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Tokens/sec</div>
+        <div class="stat-value" id="stat-toks">--</div>
+        <div class="stat-desc">Processing speed. Higher is better. On your M4 Max you'll see ~30-40k tokens/sec. H100 GPUs do 500k+, which is why they can train in 10 minutes.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Step</div>
+        <div class="stat-value" id="stat-step">--</div>
+        <div class="stat-desc">Current training step out of total iterations. Each step processes one batch of tokens and updates all the model's weights once.</div>
+      </div>
+    </div>
+
+    <!-- Size Estimator -->
+    <div class="size-bar" id="tour-target-size">
+      <div class="section-header" style="margin-bottom:0;">
+        <div class="section-title" style="margin-bottom:2px;">Model Size Estimate</div>
+        <div class="section-desc" style="margin-bottom:4px;">Your final model must fit in 16MB after int8 quantisation and zlib compression. This bar estimates how much space your current architecture will use. Green = safe, orange = tight, red = over the limit. The leaderboard winners use aggressive quantisation (int5/int6) to fit more parameters.</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; color:var(--muted);">Estimated compressed size</span>
+        <span style="font-size:14px; font-weight:700;" id="size-estimate">-- MB</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="size-bar-fill" style="width:0%; background:var(--green);"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px;">
+        <span>0 MB</span>
+        <span style="color:var(--red);">16 MB limit</span>
+      </div>
+    </div>
+
+    <!-- Loss Chart -->
+    <div class="chart-container" id="tour-target-chart">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <div>
+          <span style="font-size:11px; color:var(--muted);">Training Loss Over Time</span>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">This chart shows how the model's prediction error decreases as it trains. A healthy curve drops steeply at first then gradually flattens. If it plateaus early, try different hyperparameters.</div>
+        </div>
+        <span style="font-size:10px; color:var(--muted);" id="chart-info"></span>
+      </div>
+      <canvas class="chart-canvas" id="loss-chart"></canvas>
+    </div>
+
+    <!-- Validation Progress -->
+    <div class="val-progress-bar" id="val-progress-bar">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; color:var(--purple);">Validating model on held-out data...</span>
+        <span style="font-size:12px; font-weight:600; color:var(--purple);" id="val-progress-pct">0%</span>
+      </div>
+      <div class="vp-track">
+        <div class="vp-fill" id="val-progress-fill" style="width:0%;"></div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-panel" id="tour-target-log">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <div>
+          <span style="font-size:11px; color:var(--muted);">Live Output</span>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">Raw output from the training script. Blue lines are step summaries, green lines show validation results, and gold lines are the final quantised model score — that gold number is what counts for the competition.</div>
+        </div>
+        <button class="btn-ghost" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-output" id="log-output">Ready. Choose a preset and hit Launch to start your first experiment.</div>
+    </div>
+
+    <!-- Advisor -->
+    <div class="advisor-panel" id="advisor-panel">
+      <div class="advisor-header">
+        <div>
+          <div class="advisor-title">Experiment Advisor</div>
+          <div class="advisor-subtitle">Analyses your results and suggests what to try next</div>
+        </div>
+        <button class="btn-ghost" onclick="refreshAdvisor()" style="color:var(--purple);border-color:var(--purple);">Refresh</button>
+      </div>
+      <div id="advisor-content">
+        <div class="advisor-analysis">
+          <div class="aa-title">Ready to start</div>
+          <div class="aa-body">Run your first experiment, then come back here for personalised suggestions on what to try next. Each suggestion is ranked by expected impact based on what worked for the competition leaders.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT: Leaderboard ===== -->
+  <div class="panel" id="right-panel">
+
+    <!-- Your Score -->
+    <div class="your-score" id="tour-target-yourscore">
+      <div class="ys-label">Your Best Score</div>
+      <div class="ys-value" id="your-best-bpb">--</div>
+      <div class="ys-rank" id="your-rank">Run an experiment to get your first score</div>
+      <div class="ys-delta" id="your-delta"></div>
+    </div>
+
+    <div class="panel-title">Your Experiments</div>
+    <div class="panel-desc">Every experiment you run is saved here, ranked by BPB score. Click any entry to see its config, load it back into the controls, or delete it. Use this to track what works and iterate.</div>
+    <div id="local-leaderboard"></div>
+
+    <div style="margin-top:16px;">
+      <div class="panel-title">Global Competition</div>
+      <div class="panel-desc">The official leaderboard — all scored on 8xH100 GPUs with 20k iterations. These are the targets to aim for once you deploy to cloud. Your local runs use fewer iterations, so expect higher (worse) BPB. Focus on which <em>settings</em> move the needle, then scale up on cloud for a real score.</div>
+
+      <div class="global-board" id="tour-target-global">
+        <div class="gb-title">Official Leaderboard &bull; 8xH100 &bull; 20k iters</div>
+        <div id="global-board-entries"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOUR OVERLAY ===== -->
+<div class="tour-overlay" id="tour-overlay"></div>
+<div class="tour-highlight" id="tour-highlight" style="display:none;"></div>
+<div class="tour-card" id="tour-card" style="display:none;"></div>
+
+<script>
+// ===== STATE =====
+let currentConfig = {};
+let activeExpId = null;
+let pollTimer = null;
+let lossHistory = [];
+let bestBpb = null;
+
+// Global competition entries
+const GLOBAL_ENTRIES = [
+  { name: 'thwu1 — Int5 + BigramHash', score: 1.1428 },
+  { name: 'Raahil — SmearGate + BigramHash', score: 1.1458 },
+  { name: 'aruniyer — MLP3x Int6 QAT', score: 1.1502 },
+  { name: 'aquarious — SmearGate + OrthoInit', score: 1.1556 },
+  { name: 'yahya010 — Int6 QAT + Zstd', score: 1.1586 },
+  { name: 'aquarious — Mixed Quant', score: 1.1630 },
+  { name: 'notapplica — Muon WD + 10L', score: 1.1748 },
+  { name: 'Matthew Li — Sliding Window', score: 1.1925 },
+  { name: 'samacqua — LoRA TTT', score: 1.1928 },
+  { name: 'Spokane Way — 4k seq', score: 1.2014 },
+  { name: 'Baseline', score: 1.2244 },
+];
+
+// ===== PRESETS =====
+const PRESETS = {
+  baseline: {
+    name: 'baseline', num_layers: 9, model_dim: 512, num_heads: 8, num_kv_heads: 4,
+    mlp_mult: 2, vocab_size: 1024, iterations: 200, train_seq_len: 1024,
+    train_batch_tokens: 8192, warmup_steps: 20, warmdown_iters: 1200, grad_clip_norm: 0,
+    max_wallclock_seconds: 600, tied_embed_lr: 0.05, matrix_lr: 0.04, scalar_lr: 0.04,
+    muon_momentum: 0.95, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 8192, val_loss_every: 0, train_log_every: 200,
+    use_smeargate: 0, bigram_vocab_size: 0, bigram_dim: 128, muon_weight_decay: 0,
+    eval_stride: 0, swa_enabled: 0, swa_start_frac: 0.4, swa_every: 50,
+    quant_bits_mlp: 8, quant_bits_attn: 8,
+  },
+  fast_smoke: {
+    name: 'fast_smoke', num_layers: 6, model_dim: 384, num_heads: 6, num_kv_heads: 3,
+    mlp_mult: 2, vocab_size: 1024, iterations: 100, train_seq_len: 512,
+    train_batch_tokens: 4096, warmup_steps: 10, warmdown_iters: 400, grad_clip_norm: 0,
+    max_wallclock_seconds: 120, tied_embed_lr: 0.05, matrix_lr: 0.04, scalar_lr: 0.04,
+    muon_momentum: 0.95, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 4096, val_loss_every: 0, train_log_every: 50,
+    use_smeargate: 1, bigram_vocab_size: 4096, bigram_dim: 128, muon_weight_decay: 0.04,
+    eval_stride: 64, swa_enabled: 1, swa_start_frac: 0.4, swa_every: 50,
+  },
+  wider_mlp: {
+    name: 'wider_mlp', num_layers: 9, model_dim: 512, num_heads: 8, num_kv_heads: 4,
+    mlp_mult: 3, vocab_size: 1024, iterations: 300, train_seq_len: 1024,
+    train_batch_tokens: 8192, warmup_steps: 20, warmdown_iters: 1200, grad_clip_norm: 0,
+    max_wallclock_seconds: 600, tied_embed_lr: 0.05, matrix_lr: 0.04, scalar_lr: 0.04,
+    muon_momentum: 0.95, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 8192, val_loss_every: 0, train_log_every: 100,
+    use_smeargate: 0, bigram_vocab_size: 0, bigram_dim: 128, muon_weight_decay: 0,
+    eval_stride: 0, swa_enabled: 0, swa_start_frac: 0.4, swa_every: 50,
+    quant_bits_mlp: 8, quant_bits_attn: 8,
+  },
+  deep_10l: {
+    name: 'deep_10L', num_layers: 10, model_dim: 512, num_heads: 8, num_kv_heads: 4,
+    mlp_mult: 3, vocab_size: 1024, iterations: 300, train_seq_len: 1024,
+    train_batch_tokens: 8192, warmup_steps: 20, warmdown_iters: 1200, grad_clip_norm: 0,
+    max_wallclock_seconds: 600, tied_embed_lr: 0.05, matrix_lr: 0.02, scalar_lr: 0.04,
+    muon_momentum: 0.99, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 8192, val_loss_every: 0, train_log_every: 100,
+    use_smeargate: 1, bigram_vocab_size: 4096, bigram_dim: 128, muon_weight_decay: 0.04,
+    eval_stride: 64, swa_enabled: 1, swa_start_frac: 0.4, swa_every: 50,
+  },
+  long_ctx: {
+    name: 'long_context', num_layers: 9, model_dim: 512, num_heads: 8, num_kv_heads: 4,
+    mlp_mult: 2, vocab_size: 1024, iterations: 300, train_seq_len: 2048,
+    train_batch_tokens: 16384, warmup_steps: 20, warmdown_iters: 1200, grad_clip_norm: 0,
+    max_wallclock_seconds: 600, tied_embed_lr: 0.05, matrix_lr: 0.04, scalar_lr: 0.04,
+    muon_momentum: 0.95, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 16384, val_loss_every: 0, train_log_every: 100,
+    use_smeargate: 0, bigram_vocab_size: 0, bigram_dim: 128, muon_weight_decay: 0,
+    eval_stride: 0, swa_enabled: 0, swa_start_frac: 0.4, swa_every: 50,
+    quant_bits_mlp: 8, quant_bits_attn: 8,
+  },
+  aggressive: {
+    name: 'sota_stack', num_layers: 10, model_dim: 512, num_heads: 8, num_kv_heads: 4,
+    mlp_mult: 3, vocab_size: 1024, iterations: 3000, train_seq_len: 2048,
+    train_batch_tokens: 16384, warmup_steps: 20, warmdown_iters: 3000, grad_clip_norm: 0.3,
+    max_wallclock_seconds: 3600, tied_embed_lr: 0.05, matrix_lr: 0.02, scalar_lr: 0.04,
+    muon_momentum: 0.99, qk_gain_init: 1.5, logit_softcap: 30,
+    val_batch_size: 16384, val_loss_every: 0, train_log_every: 100,
+    use_smeargate: 1, bigram_vocab_size: 10240, bigram_dim: 128, muon_weight_decay: 0.04,
+    eval_stride: 64, swa_enabled: 1, swa_start_frac: 0.4, swa_every: 50,
+    quant_bits_mlp: 6, quant_bits_attn: 6,
+  },
+};
+
+// ===== TOUR =====
+const TOUR_STEPS = [
+  {
+    target: 'tour-target-header',
+    title: 'Welcome to Parameter Golf',
+    body: 'This is a competition to train the best possible language model that fits in just 16 megabytes. Your model will be scored on "Bits Per Byte" (BPB) — a measure of how well it compresses text. Lower BPB means the model is better at predicting the next word. The current world record is 1.1428 BPB, shown here in the top right. Your goal is to get as close to that as possible, or even beat it.',
+    position: 'below',
+  },
+  {
+    target: 'tour-target-presets',
+    title: 'Quick Presets',
+    body: 'These buttons load pre-configured settings for common experiments. Start with "Quick Smoke" for a fast test run (about 30 seconds), then try "3x MLP" or "10 Layers" to see how specific changes affect the score. "Aggressive" stacks all the known winning techniques together. Think of these as starting points — you can tweak any individual slider after loading a preset.',
+    position: 'right',
+  },
+  {
+    target: 'tour-target-architecture',
+    title: 'Architecture Controls',
+    body: 'This is where you design the structure of your neural network. Each slider has a description below it explaining exactly what it does and how it impacts performance. The key tension is: bigger models are smarter, but they must compress to under 16MB. The winners found the sweet spot by using 10 layers, 3x MLP expansion, and aggressive quantisation to pack more intelligence into fewer bytes.',
+    position: 'right',
+  },
+  {
+    target: 'tour-target-training',
+    title: 'Training Controls',
+    body: 'These control the learning process itself. The most impactful settings here are Iterations (how long you train), Sequence Length (how much context the model sees), and Warmdown (how gracefully training ends). For local experiments, keep iterations low (200-500) to get quick feedback. The real competition runs happen on cloud GPUs with 20,000 iterations.',
+    position: 'right',
+  },
+  {
+    target: 'tour-target-optimiser',
+    title: 'Optimiser Controls',
+    body: 'The optimiser is what turns "the model was wrong" into "the model is now less wrong." This model uses Muon, a cutting-edge optimiser that orthogonalises gradients before applying them — it was designed specifically for training efficiency. The Muon Momentum slider (0.95 vs 0.99) is one of the easiest wins: every leader uses 0.99. The Matrix LR controls how aggressively the big weight matrices are updated.',
+    position: 'right',
+  },
+  {
+    target: 'tour-target-stats',
+    title: 'Live Metrics',
+    body: 'When an experiment is running, these cards update in real time. Best BPB is your personal high score across all experiments — the number that matters for the competition. Current Loss shows how the model is doing right now during training. Tokens/sec tells you how fast your machine is processing data. Step shows training progress.',
+    position: 'below',
+  },
+  {
+    target: 'tour-target-size',
+    title: 'Size Budget',
+    body: 'This is your 16MB budget visualised. As you adjust the architecture sliders on the left, this bar updates to show how much space your model will need after compression. If it turns red, you need to either reduce the model size or use more aggressive quantisation. The competition leaders use int5 quantisation for MLP weights to squeeze in an extra layer — that kind of creative compression is what wins.',
+    position: 'below',
+  },
+  {
+    target: 'tour-target-chart',
+    title: 'Training Loss Chart',
+    body: 'This chart draws in real time as your model trains. A healthy training curve drops steeply at first (the model is learning the basics fast) then gradually flattens (refinement). If the curve plateaus too early, the model might need more capacity (bigger architecture) or different learning rates. If it spikes up, the learning rate might be too high.',
+    position: 'below',
+  },
+  {
+    target: 'tour-target-yourscore',
+    title: 'Your Score vs The World',
+    body: 'This card shows your personal best BPB and where you rank against the global competition. After each experiment, it updates to show how far you are from the current leader and what position you would hold on the global leaderboard. This is your scoreboard — watch it improve as you learn what works.',
+    position: 'left',
+  },
+  {
+    target: 'tour-target-global',
+    title: 'Global Leaderboard',
+    body: 'These are the actual scores from the OpenAI Parameter Golf competition. Your best score is inserted into this list so you can see exactly where you stand. The gap between the baseline (1.2244) and the leader (1.1428) is 0.08 BPB — that might look small, but each 0.005 improvement represents a meaningful advance in model quality. Study what the leaders did: they combined wider MLPs, more layers, better quantisation, sliding window eval, and clever tricks like BigramHash.',
+    position: 'left',
+  },
+  {
+    target: 'run-btn',
+    title: 'Ready to Go!',
+    body: 'Hit this button to launch your first experiment. Start with the "Quick Smoke" preset for a fast 30-second test, then graduate to longer runs as you get a feel for what each lever does. Every experiment is saved automatically, so you can always compare results and reload configs that worked well. Have fun — and remember, every world record was once someone\'s first experiment.',
+    position: 'above',
+  },
+];
+
+let tourStep = -1;
+
+function startTour() {
+  tourStep = 0;
+  showTourStep();
+}
+
+function showTourStep() {
+  if (tourStep < 0 || tourStep >= TOUR_STEPS.length) {
+    endTour();
+    return;
+  }
+
+  const step = TOUR_STEPS[tourStep];
+  const target = document.getElementById(step.target);
+  const overlay = document.getElementById('tour-overlay');
+  const highlight = document.getElementById('tour-highlight');
+  const card = document.getElementById('tour-card');
+
+  overlay.classList.add('active');
+
+  // Scroll target into view
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  setTimeout(() => {
+    const rect = target.getBoundingClientRect();
+    const pad = 8;
+
+    // Position highlight
+    highlight.style.display = 'block';
+    highlight.style.left = (rect.left - pad) + 'px';
+    highlight.style.top = (rect.top - pad) + 'px';
+    highlight.style.width = (rect.width + pad * 2) + 'px';
+    highlight.style.height = (rect.height + pad * 2) + 'px';
+
+    // Build dots
+    const dots = TOUR_STEPS.map((_, i) =>
+      `<div class="tour-dot ${i < tourStep ? 'done' : ''} ${i === tourStep ? 'active' : ''}"></div>`
+    ).join('');
+
+    // Build card
+    card.innerHTML = `
+      <div class="tour-step-label">Step ${tourStep + 1} of ${TOUR_STEPS.length}</div>
+      <div class="tour-title">${step.title}</div>
+      <div class="tour-body">${step.body}</div>
+      <div class="tour-actions">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button class="tour-btn-skip" onclick="endTour()">Skip tour</button>
+          <div class="tour-dots">${dots}</div>
+        </div>
+        <button class="tour-btn" onclick="nextTourStep()">
+          ${tourStep === TOUR_STEPS.length - 1 ? "Let's go!" : 'Next \u2192'}
+        </button>
+      </div>
+    `;
+
+    // Position card
+    card.style.display = 'block';
+    const cardRect = card.getBoundingClientRect();
+    let left, top;
+
+    switch (step.position) {
+      case 'below':
+        left = rect.left + rect.width / 2 - cardRect.width / 2;
+        top = rect.bottom + 16;
+        break;
+      case 'above':
+        left = rect.left + rect.width / 2 - cardRect.width / 2;
+        top = rect.top - cardRect.height - 16;
+        break;
+      case 'right':
+        left = rect.right + 16;
+        top = rect.top;
+        break;
+      case 'left':
+        left = rect.left - cardRect.width - 16;
+        top = rect.top;
+        break;
+    }
+
+    // Clamp to viewport
+    left = Math.max(16, Math.min(left, window.innerWidth - cardRect.width - 16));
+    top = Math.max(16, Math.min(top, window.innerHeight - cardRect.height - 16));
+
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
+  }, 300);
+}
+
+function nextTourStep() {
+  tourStep++;
+  showTourStep();
+}
+
+function endTour() {
+  tourStep = -1;
+  document.getElementById('tour-overlay').classList.remove('active');
+  document.getElementById('tour-highlight').style.display = 'none';
+  document.getElementById('tour-card').style.display = 'none';
+}
+
+// ===== SLIDER + CONFIG =====
+
+function updateSlider(el) {
+  const key = el.dataset.key;
+  const val = parseFloat(el.value);
+  const display = Number.isInteger(val) ? String(val) : val.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+  document.getElementById(`val-${key}`).textContent = display;
+  currentConfig[key] = val;
+  estimateSize();
+}
+
+function saveControlsToStorage() {
+  const config = getConfig();
+  localStorage.setItem('pgolf_controls', JSON.stringify(config));
+}
+
+function restoreControlsFromStorage() {
+  try {
+    const saved = localStorage.getItem('pgolf_controls');
+    if (!saved) return false;
+    const config = JSON.parse(saved);
+    document.getElementById('exp-name').value = config.name || 'experiment';
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+      const key = slider.dataset.key;
+      if (key in config) {
+        slider.value = config[key];
+        updateSlider(slider);
+      }
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+function loadPreset(name, btnEl) {
+  const preset = PRESETS[name];
+  if (!preset) return;
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  document.getElementById('exp-name').value = preset.name;
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const key = slider.dataset.key;
+    if (key in preset) {
+      slider.value = preset[key];
+      updateSlider(slider);
+    }
+  });
+  saveControlsToStorage();
+}
+
+function estimateSize() {
+  const d = currentConfig.model_dim || 512;
+  const L = currentConfig.num_layers || 9;
+  const V = currentConfig.vocab_size || 1024;
+  const H = currentConfig.num_heads || 8;
+  const KV = currentConfig.num_kv_heads || 4;
+  const M = currentConfig.mlp_mult || 2;
+  const headDim = d / H;
+  const kvDim = KV * headDim;
+  const attnParams = d * d + d * kvDim + d * kvDim + d * d;
+  const mlpParams = d * (M * d) + (M * d) * d;
+  const layerParams = attnParams + mlpParams;
+  const totalParams = V * d + L * layerParams + L * d * 3;
+  const estimatedMB = (totalParams * 0.65) / 1_000_000;
+  const pct = Math.min((estimatedMB / 16) * 100, 100);
+  const bar = document.getElementById('size-bar-fill');
+  bar.style.width = pct + '%';
+  bar.style.background = estimatedMB > 16 ? 'var(--red)' : estimatedMB > 14 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('size-estimate').textContent = estimatedMB.toFixed(1) + ' MB';
+  document.getElementById('size-estimate').style.color = estimatedMB > 16 ? 'var(--red)' : 'var(--text)';
+}
+
+function getConfig() {
+  const config = { name: document.getElementById('exp-name').value };
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    config[slider.dataset.key] = parseFloat(slider.value);
+  });
+  return config;
+}
+
+// ===== GLOBAL BOARD WITH YOUR SCORE =====
+
+function renderGlobalBoard() {
+  const el = document.getElementById('global-board-entries');
+
+  // Global board is reference only — no "YOU" inserted
+  el.innerHTML = GLOBAL_ENTRIES.map((e, i) => {
+    const cls = i === 0 ? 'global-entry ge-top' : 'global-entry';
+    return `<div class="${cls}"><span class="ge-name">${i + 1}. ${e.name}</span><span class="ge-score">${e.score.toFixed(4)}</span></div>`;
+  }).join('');
+
+  // Update your-score card
+  const ysValue = document.getElementById('your-best-bpb');
+  const ysRank = document.getElementById('your-rank');
+  const ysDelta = document.getElementById('your-delta');
+
+  if (bestBpb !== null) {
+    ysValue.textContent = bestBpb.toFixed(4);
+
+    // Count how many of YOUR experiments exist
+    const expCount = document.querySelectorAll('#local-leaderboard .leaderboard-entry').length || 1;
+    ysRank.textContent = `Best of ${expCount} local experiment${expCount !== 1 ? 's' : ''}`;
+
+    // Show context about what this means
+    const baseline = GLOBAL_ENTRIES.find(e => e.name === 'Baseline');
+    const baselineScore = baseline ? baseline.score : 1.2244;
+    const sotaScore = GLOBAL_ENTRIES[0].score;
+
+    if (bestBpb > baselineScore) {
+      // Worse than baseline — expected for short local runs
+      const gap = bestBpb - baselineScore;
+      ysDelta.innerHTML = `${gap.toFixed(4)} above baseline (${baselineScore.toFixed(4)})<br><span style="font-size:9px;color:var(--muted);">Baseline trained 20k iters on 8xH100 — increase iterations to close the gap</span>`;
+      ysDelta.className = 'ys-delta negative';
+    } else if (bestBpb > sotaScore) {
+      // Better than baseline but not SOTA
+      const gapToSota = bestBpb - sotaScore;
+      ysDelta.innerHTML = `Beat the baseline! ${gapToSota.toFixed(4)} from global SOTA`;
+      ysDelta.className = 'ys-delta positive';
+    } else {
+      ysDelta.innerHTML = `You beat the global SOTA!`;
+      ysDelta.className = 'ys-delta positive';
+    }
+  }
+}
+
+// ===== EXPERIMENT CONTROLS =====
+
+async function startExperiment() {
+  const config = getConfig();
+  saveControlsToStorage();
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('stop-btn').style.display = 'block';
+  lossHistory = [];
+
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    const data = await resp.json();
+    activeExpId = data.id;
+    document.getElementById('log-output').textContent = `Experiment ${data.id} started...\n`;
+    startPolling();
+  } catch (e) {
+    document.getElementById('log-output').textContent = `Error: ${e.message}`;
+    document.getElementById('run-btn').disabled = false;
+    document.getElementById('stop-btn').style.display = 'none';
+  }
+}
+
+async function stopExperiment() {
+  if (!activeExpId) return;
+  await fetch('/api/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: activeExpId }),
+  });
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollActive, 1500);
+}
+
+async function pollActive() {
+  const logEl = document.getElementById('log-output');
+  try {
+    const resp = await fetch('/api/active');
+    const data = await resp.json();
+
+    if (!activeExpId) { console.log('[poll] no activeExpId'); return; }
+    if (!data[activeExpId]) {
+      console.log('[poll] activeExpId not in response:', activeExpId, Object.keys(data));
+      return;
+    }
+
+    const run = data[activeExpId];
+    console.log('[poll] status:', run.status, 'loss:', run.latest_loss, 'step:', run.progress);
+
+    // Update stats
+    if (run.latest_loss != null) {
+      document.getElementById('stat-loss').textContent = run.latest_loss.toFixed(4);
+      lossHistory.push(run.latest_loss);
+      drawChart();
+    }
+    if (run.tok_s != null) {
+      document.getElementById('stat-toks').textContent = (run.tok_s / 1000).toFixed(1) + 'k';
+    }
+    if (run.progress) {
+      document.getElementById('stat-step').textContent = run.progress.step + '/' + run.progress.total;
+    }
+
+    // BPB — show status while waiting
+    const bpbEl = document.getElementById('stat-best-bpb');
+    const ysValueEl = document.getElementById('your-best-bpb');
+    const ysRankEl = document.getElementById('your-rank');
+
+    if (run.final_bpb != null) {
+      if (bestBpb === null || run.final_bpb < bestBpb) {
+        bestBpb = run.final_bpb;
+      }
+      bpbEl.textContent = run.final_bpb.toFixed(4);
+      bpbEl.style.color = 'var(--gold)';
+      bpbEl.style.fontSize = '';
+      renderGlobalBoard();
+    } else if (run.val_progress) {
+      const pct = Math.round((run.val_progress.current / run.val_progress.total) * 100);
+      bpbEl.textContent = 'eval ' + pct + '%';
+      bpbEl.style.fontSize = '16px';
+      bpbEl.style.color = 'var(--purple)';
+      ysValueEl.textContent = 'eval ' + pct + '%';
+      ysRankEl.textContent = 'Validation in progress — BPB score appears when complete';
+    } else if (run.progress) {
+      bpbEl.textContent = 'training...';
+      bpbEl.style.fontSize = '16px';
+      bpbEl.style.color = 'var(--muted)';
+      ysValueEl.textContent = '...';
+      ysRankEl.textContent = 'Training in progress — validation runs after training completes';
+    }
+
+    // Validation progress bar
+    const vpBar = document.getElementById('val-progress-bar');
+    if (run.val_progress) {
+      vpBar.classList.add('active');
+      const pct = Math.round((run.val_progress.current / run.val_progress.total) * 100);
+      document.getElementById('val-progress-pct').textContent = pct + '%';
+      document.getElementById('val-progress-fill').style.width = pct + '%';
+    } else {
+      vpBar.classList.remove('active');
+    }
+
+    // Status line
+    let statusText = run.status;
+    if (run.warmup) statusText = 'warming up (' + run.warmup + ')';
+    else if (run.val_progress) statusText = 'validating';
+    else if (run.progress) statusText = 'training step ' + run.progress.step + '/' + run.progress.total;
+
+    // Render log — clean, filtered, no spam
+    const logLines = run.log && run.log.length ? run.log : [];
+    const rendered = [`<span style="color:var(--cyan);font-weight:600;">Status: ${esc(statusText)}</span>`];
+    for (const line of logLines) {
+      if (line.startsWith('final_')) rendered.push(`<span class="log-final">${esc(line)}</span>`);
+      else if (line.includes('val_bpb:')) rendered.push(`<span class="log-val">${esc(line)}</span>`);
+      else if (line.startsWith('step:')) rendered.push(`<span class="log-step">${esc(line)}</span>`);
+      else rendered.push(esc(line));
+    }
+    logEl.innerHTML = rendered.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+
+    // Check if done
+    if (['completed', 'failed', 'stopped', 'error'].includes(run.status)) {
+      clearInterval(pollTimer);
+      document.getElementById('run-btn').disabled = false;
+      document.getElementById('stop-btn').style.display = 'none';
+      activeExpId = null;
+      refreshLeaderboard();
+      refreshAdvisor();
+    }
+  } catch (e) {
+    console.error('[poll] error:', e);
+    logEl.textContent += '\n[poll error: ' + e.message + ']';
+  }
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function drawChart() {
+  const canvas = document.getElementById('loss-chart');
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+  if (cw === 0 || ch === 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  if (lossHistory.length < 2) return;
+
+  const padTop = 10;
+  const padBottom = 30;
+  const drawH = ch - padTop - padBottom;
+  const min = Math.min(...lossHistory);
+  const max = Math.max(...lossHistory);
+  const range = max - min || 1;
+
+  function yPos(v) {
+    return padTop + ((max - v) / range) * drawH;
+  }
+
+  // Grid
+  ctx.strokeStyle = '#1a2332'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padTop + (i / 4) * drawH;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+  }
+
+  // Build the points array
+  const pts = lossHistory.map((v, i) => ({
+    x: (i / (lossHistory.length - 1)) * cw,
+    y: yPos(v),
+  }));
+
+  // Fill area (line -> bottom-right -> bottom-left -> close)
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.lineTo(pts[pts.length - 1].x, padTop + drawH);
+  ctx.lineTo(pts[0].x, padTop + drawH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, padTop, 0, padTop + drawH);
+  grad.addColorStop(0, 'rgba(59,130,246,0.18)');
+  grad.addColorStop(1, 'rgba(59,130,246,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Stroke line on top
+  ctx.beginPath();
+  ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2;
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+
+  document.getElementById('chart-info').textContent =
+    `min: ${min.toFixed(3)} | latest: ${lossHistory[lossHistory.length - 1].toFixed(3)}`;
+}
+
+async function refreshLeaderboard() {
+  try {
+    const resp = await fetch('/api/leaderboard');
+    const data = await resp.json();
+    const el = document.getElementById('local-leaderboard');
+
+    if (data.length === 0) {
+      el.innerHTML = '<div style="color:var(--muted); font-size:12px; text-align:center; padding:20px;">No experiments yet. Launch your first one!</div>';
+      return;
+    }
+
+    if (data[0].final_bpb && (bestBpb === null || data[0].final_bpb < bestBpb)) {
+      bestBpb = data[0].final_bpb;
+    }
+    document.getElementById('stat-best-bpb').textContent = bestBpb ? bestBpb.toFixed(4) : '--';
+    renderGlobalBoard();
+
+    el.innerHTML = data.slice(0, 20).map((exp, i) => {
+      const cfg = exp.config || {};
+      const configStr = `L=${cfg.num_layers || '?'} D=${cfg.model_dim || '?'} MLP=${cfg.mlp_mult || '?'}x H=${cfg.num_heads || '?'}/${cfg.num_kv_heads || '?'} Seq=${cfg.train_seq_len || '?'} Iters=${cfg.iterations || '?'} MLR=${cfg.matrix_lr || '?'} Muon=${cfg.muon_momentum || '?'}`;
+      const elapsed = exp.elapsed_seconds ? (exp.elapsed_seconds > 60 ? (exp.elapsed_seconds / 60).toFixed(1) + 'm' : exp.elapsed_seconds.toFixed(0) + 's') : '?';
+      return `
+        <div class="leaderboard-entry" onclick="this.classList.toggle('expanded')">
+          <span class="rank">#${i + 1}</span>
+          <span class="entry-bpb">${exp.final_bpb ? exp.final_bpb.toFixed(4) : '--'}</span>
+          <span class="entry-name">${esc(cfg.name || exp.id)}</span>
+          <div class="entry-meta">${elapsed} &bull; ${new Date(exp.timestamp).toLocaleString()}</div>
+          <div class="entry-config">${esc(configStr)}
+            <br><button class="btn-ghost" style="margin-top:6px;" onclick="event.stopPropagation(); deleteExperiment('${exp.id}')">Delete</button>
+            <button class="btn-ghost" style="margin-top:6px; margin-left:4px;" onclick="event.stopPropagation(); loadFromExperiment(${JSON.stringify(cfg).replace(/"/g, '&quot;')})">Load Config</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) { /* retry */ }
+}
+
+async function deleteExperiment(id) {
+  await fetch('/api/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+  refreshLeaderboard();
+}
+
+function loadFromExperiment(cfg) {
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const key = slider.dataset.key;
+    if (key in cfg) { slider.value = cfg[key]; updateSlider(slider); }
+  });
+  if (cfg.name) document.getElementById('exp-name').value = cfg.name + '_v2';
+  saveControlsToStorage();
+}
+
+async function refreshAdvisor() {
+  try {
+    const resp = await fetch('/api/advisor');
+    const data = await resp.json();
+
+    // Save to localStorage so suggestions persist across reloads
+    localStorage.setItem('pgolf_advisor', JSON.stringify(data));
+
+    renderAdvisor(data);
+  } catch (e) {
+    console.error('[advisor]', e);
+  }
+}
+
+function renderAdvisor(data) {
+  const container = document.getElementById('advisor-content');
+  if (!data) {
+    container.innerHTML = '<div class="advisor-analysis"><div class="aa-body">No suggestions yet — run an experiment first.</div></div>';
+    return;
+  }
+
+  let html = '';
+
+  // Analysis section
+  for (const a of (data.analysis || [])) {
+    html += `<div class="advisor-analysis">
+      <div class="aa-title">${esc(a.title)}</div>
+      <div class="aa-body">${esc(a.body)}</div>
+    </div>`;
+  }
+
+  // Suggestions
+  const suggestions = data.suggestions || [];
+  if (suggestions.length > 0) {
+    // Collect all presets for "Apply All"
+    const allPresets = {};
+    for (const s of suggestions) {
+      if (s.preset) Object.assign(allPresets, s.preset);
+    }
+    const allPresetsJson = JSON.stringify(allPresets).replace(/"/g, '&quot;');
+
+    html += `<div style="margin:12px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:10px;color:var(--purple);text-transform:uppercase;letter-spacing:1px;">Suggested next moves (${suggestions.length})</span>
+      </div>
+      <button onclick='applyAllSuggestions(${allPresetsJson})' style="
+        width:100%; padding:12px 20px; border:none; border-radius:8px; cursor:pointer;
+        background:linear-gradient(135deg, var(--purple), #6d28d9);
+        color:white; font-family:inherit; font-size:13px; font-weight:700;
+        letter-spacing:0.5px; transition:all 0.15s;
+        box-shadow:0 4px 15px rgba(139,92,246,0.3);
+      " onmouseover="this.style.filter='brightness(1.15)';this.style.transform='translateY(-1px)'"
+         onmouseout="this.style.filter='';this.style.transform=''">
+        Apply all ${suggestions.length} suggestions to controls
+      </button>
+    </div>`;
+
+    for (let i = 0; i < suggestions.length; i++) {
+      const s = suggestions[i];
+      const presetJson = JSON.stringify(s.preset || {}).replace(/"/g, '&quot;');
+      html += `<div class="suggestion-card">
+        <div class="sg-header">
+          <span class="sg-rank">${i + 1}</span>
+          <span class="sg-title">${esc(s.title)}</span>
+          ${s.impact ? `<span class="sg-impact">${esc(s.impact)}</span>` : ''}
+        </div>
+        <div class="sg-body">${esc(s.body)}</div>
+        ${s.already_tried ? '<div class="sg-tried">You\'ve tried this value before — but results may differ in combination with other changes</div>' : ''}
+        ${Object.keys(s.preset || {}).length > 0 ? `<button class="sg-apply" onclick='applySuggestion(${presetJson})'>Apply &amp; load into controls</button>` : ''}
+      </div>`;
+    }
+  }
+
+  container.innerHTML = html || '<div class="advisor-analysis"><div class="aa-body">No suggestions yet — run an experiment first.</div></div>';
+}
+
+function applyAllSuggestions(preset) {
+  const changedSliders = [];
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const key = slider.dataset.key;
+    if (key in preset) {
+      slider.value = preset[key];
+      updateSlider(slider);
+      changedSliders.push(slider);
+    }
+  });
+
+  // Name it descriptively
+  document.getElementById('exp-name').value = 'advisor_all';
+
+  // Pulse all changed controls
+  changedSliders.forEach(s => {
+    const ctrl = s.closest('.control');
+    if (ctrl) {
+      ctrl.classList.remove('pulse-highlight');
+      void ctrl.offsetWidth;
+      ctrl.classList.add('pulse-highlight');
+      ctrl.addEventListener('animationend', () => ctrl.classList.remove('pulse-highlight'), { once: true });
+    }
+  });
+
+  // Scroll to top of controls
+  document.getElementById('controls-panel').scrollTop = 0;
+  saveControlsToStorage();
+}
+
+function applySuggestion(preset) {
+  const changedSliders = [];
+
+  document.querySelectorAll('input[type="range"]').forEach(slider => {
+    const key = slider.dataset.key;
+    if (key in preset) {
+      slider.value = preset[key];
+      updateSlider(slider);
+      changedSliders.push(slider);
+    }
+  });
+
+  // Update experiment name — keep it short
+  const paramName = Object.keys(preset)[0] || 'tweak';
+  const nameInput = document.getElementById('exp-name');
+  const baseName = nameInput.value.split('_')[0] || 'exp';
+  nameInput.value = baseName + '_' + paramName;
+
+  saveControlsToStorage();
+
+  // Scroll to the first changed slider and pulse it
+  if (changedSliders.length > 0) {
+    const firstSlider = changedSliders[0];
+    const controlDiv = firstSlider.closest('.control');
+
+    if (controlDiv) {
+      // Scroll the controls panel to show this control
+      controlDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Pulse all changed controls
+      changedSliders.forEach(s => {
+        const ctrl = s.closest('.control');
+        if (ctrl) {
+          ctrl.classList.remove('pulse-highlight');
+          // Force reflow so the animation restarts
+          void ctrl.offsetWidth;
+          ctrl.classList.add('pulse-highlight');
+          ctrl.addEventListener('animationend', () => {
+            ctrl.classList.remove('pulse-highlight');
+          }, { once: true });
+        }
+      });
+    }
+  }
+}
+
+let externalPollTimer = null;
+function startExternalPoll() {
+  if (externalPollTimer) clearInterval(externalPollTimer);
+  pollExternal(); // immediate first check
+  externalPollTimer = setInterval(pollExternal, 3000);
+}
+
+async function pollExternal() {
+  try {
+    const resp = await fetch('/api/external_run');
+    const run = await resp.json();
+    if (run.status === 'none') {
+      if (externalPollTimer) { clearInterval(externalPollTimer); externalPollTimer = null; }
+      return;
+    }
+
+    const logEl = document.getElementById('log-output');
+
+    // Update stats — use full loss history from log if available
+    if (run.loss_history && run.loss_history.length > 0) {
+      lossHistory = run.loss_history;
+      document.getElementById('stat-loss').textContent = lossHistory[lossHistory.length - 1].toFixed(4);
+      drawChart();
+    } else if (run.latest_loss != null) {
+      document.getElementById('stat-loss').textContent = run.latest_loss.toFixed(4);
+      if (!lossHistory.length || lossHistory[lossHistory.length-1] !== run.latest_loss) {
+        lossHistory.push(run.latest_loss);
+      }
+      drawChart();
+    }
+    if (run.tok_s != null) {
+      document.getElementById('stat-toks').textContent = (run.tok_s / 1000).toFixed(1) + 'k';
+    }
+    if (run.progress) {
+      document.getElementById('stat-step').textContent = run.progress.step + '/' + run.progress.total;
+    }
+
+    // BPB status
+    const bpbEl = document.getElementById('stat-best-bpb');
+    const ysValueEl = document.getElementById('your-best-bpb');
+    const ysRankEl = document.getElementById('your-rank');
+    if (run.final_bpb != null) {
+      if (bestBpb === null || run.final_bpb < bestBpb) bestBpb = run.final_bpb;
+      bpbEl.textContent = run.final_bpb.toFixed(4);
+      bpbEl.style.color = 'var(--gold)';
+      bpbEl.style.fontSize = '';
+      renderGlobalBoard();
+    } else if (run.val_progress) {
+      const pct = Math.round((run.val_progress.current / run.val_progress.total) * 100);
+      bpbEl.textContent = 'eval ' + pct + '%';
+      bpbEl.style.fontSize = '16px';
+      bpbEl.style.color = 'var(--purple)';
+    } else if (run.progress) {
+      bpbEl.textContent = 'training...';
+      bpbEl.style.fontSize = '16px';
+      bpbEl.style.color = 'var(--muted)';
+    }
+
+    // Val progress bar
+    const vpBar = document.getElementById('val-progress-bar');
+    if (run.val_progress) {
+      vpBar.classList.add('active');
+      const pct = Math.round((run.val_progress.current / run.val_progress.total) * 100);
+      document.getElementById('val-progress-pct').textContent = pct + '%';
+      document.getElementById('val-progress-fill').style.width = pct + '%';
+    } else {
+      vpBar.classList.remove('active');
+    }
+
+    // Status + log
+    let statusText = run.status;
+    if (run.swa_info) statusText += ' | ' + run.swa_info;
+    if (run.progress) statusText = 'training step ' + run.progress.step + '/' + run.progress.total;
+    if (run.val_progress) statusText = 'validating';
+    if (run.status === 'completed') statusText = 'COMPLETED';
+
+    const rendered = [`<span style="color:var(--cyan);font-weight:600;">Status: ${esc(statusText)} (terminal run)</span>`];
+    for (const line of (run.log || [])) {
+      if (line.startsWith('final_')) rendered.push(`<span class="log-final">${esc(line)}</span>`);
+      else if (line.includes('val_bpb:')) rendered.push(`<span class="log-val">${esc(line)}</span>`);
+      else if (line.startsWith('step:')) rendered.push(`<span class="log-step">${esc(line)}</span>`);
+      else if (line.startsWith('swa:')) rendered.push(`<span style="color:var(--purple);">${esc(line)}</span>`);
+      else rendered.push(esc(line));
+    }
+    logEl.innerHTML = rendered.join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+
+    // Stop polling if done
+    if (['completed', 'failed', 'finished_no_save'].includes(run.status)) {
+      if (externalPollTimer) { clearInterval(externalPollTimer); externalPollTimer = null; }
+      refreshLeaderboard();
+      refreshAdvisor();
+    }
+  } catch (e) {
+    console.error('[external poll]', e);
+  }
+}
+
+function clearLog() {
+  document.getElementById('log-output').textContent = 'Cleared.';
+  lossHistory = [];
+  drawChart();
+}
+
+// ===== INIT =====
+(function init() {
+  // Restore saved controls from localStorage, or fall back to baseline preset
+  const restored = restoreControlsFromStorage();
+  if (!restored) {
+    const baselineBtn = document.querySelector('.btn-preset');
+    loadPreset('baseline', baselineBtn);
+  }
+
+  // Load saved experiments and render everything
+  refreshLeaderboard();
+  renderGlobalBoard();
+
+  // Restore advisor from localStorage, then refresh from server
+  try {
+    const savedAdvisor = localStorage.getItem('pgolf_advisor');
+    if (savedAdvisor) renderAdvisor(JSON.parse(savedAdvisor));
+  } catch (e) {}
+  refreshAdvisor();
+
+  // Poll for dashboard-managed active runs
+  fetch('/api/active').then(r => r.json()).then(data => {
+    const ids = Object.keys(data);
+    if (ids.length > 0) {
+      const id = ids[0];
+      if (data[id].status === 'running' || data[id].status === 'starting') {
+        activeExpId = id;
+        document.getElementById('run-btn').disabled = true;
+        document.getElementById('stop-btn').style.display = 'block';
+        document.getElementById('log-output').textContent = `Reconnected to ${id}...`;
+        startPolling();
+        return;
+      }
+    }
+    // No dashboard run — check for external (terminal-launched) runs
+    startExternalPoll();
+  }).catch(() => { startExternalPoll(); });
+
+  console.log('[init] Dashboard initialised, currentConfig:', currentConfig);
+})();
+</script>
+</body>
+</html>
