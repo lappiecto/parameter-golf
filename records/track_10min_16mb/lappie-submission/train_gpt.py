@@ -760,11 +760,15 @@ class CausalSelfAttention(nn.Module):
         k = torch.cat([k_rope, k[..., rd:]], dim=-1)
 
         q = q * self.q_gain.to(dtype=q.dtype)[None, :, None, None]
+        # Expand KV heads manually for GQA compatibility on all hardware
+        if self.num_kv_heads != self.num_heads:
+            repeat_factor = self.num_heads // self.num_kv_heads
+            k = k.repeat_interleave(repeat_factor, dim=1)
+            v = v.repeat_interleave(repeat_factor, dim=1)
         y = F.scaled_dot_product_attention(
             q, k, v,
             attn_mask=None,
             is_causal=True,
-            enable_gqa=(self.num_kv_heads != self.num_heads),
         )
 
         # Gated Attention: per-head sigmoid gate
