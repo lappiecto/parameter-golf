@@ -3,11 +3,15 @@
   "github_id": "lappiecto",
   "team": "Lappie AI",
   "location": "Cape Town, South Africa",
-  "val_bpb": null,
-  "val_loss": null,
+  "val_bpb": 1.3471,
+  "val_loss": 2.2745,
   "artifact_bytes": null,
   "num_seeds": 3,
-  "seeds": [42, 1337, 2024],
+  "seeds": [
+    42,
+    1337,
+    2024
+  ],
   "hardware": "8xH100 SXM",
   "training_time_seconds": null,
   "eval_time_seconds": null,
@@ -49,5 +53,5 @@
     "weight_decay": 0.04,
     "grad_clip": 0.3
   },
-  "notes": "All development on Apple M4 Max 128GB (Cape Town, SA). Local best: 1.36 BPB at 10k iterations. H100 scores pending."
+  "notes": "Local M4 Max score at 20k iterations. H100 score pending. Only genuinely novel technique: Cautious Muon. All others properly attributed to prior submissions."
 }
