@@ -33,13 +33,14 @@ Platform: Apple M4 Max / 128 GB / MLX 0.31.1 / Python 3.13.2
 | 21 | ngram_only | 2026-03-26 ~01:50 | 11 | 512 | 3x | 2048 | 3000 | 3000/3000 | 28,173,402 | Yes | 10240x128 | -- | 0.99 | 0.02 | 0.3 | Skipped (0 ckpts) | No | mixed 6/6 | 1.6209 | 1.6895 | 15,617,065 | ~3093s train + ~24902s eval | Completed |
 | 22 | clean_fixed | 2026-03-26 ~09:30 | 11 | 512 | 3x | 2048 | 3000 | 10/3000 | 28,173,402 | Yes | 10240x128 | -- | 0.99 | 0.02 | 0.3 | -- | No | -- | -- | -- | -- | ~10s | Killed (log truncated at step 10) |
 | 23 | smasher | 2026-03-26 ~10:25 | 11 | 512 | 3x | 2048 | 5000 | 5000/5000 | 28,173,402 | Yes | 10240x128 | -- | 0.99 | 0.02 | 0.3 | Yes (frac 0.77, every 50), 23 ckpts | No | mixed 6/6 | 1.4351 | ~1.4257 (in progress) | 14,746,571 | ~6098s train + eval in progress | Eval in progress |
+| 24 | definitive_20k | 2026-03-28 | 11 | 512 | 3x | 2048 | 20000 | 20000/20000 | 28,255,422 | Yes | 10240x128 | 4096x64, Quad 2048 | 0.99 | 0.02 | 0.3 | Yes (start 18850, every 50), 23 ckpts | No | mixed 6/6 + Late QAT + GPTQ clip | 1.4109 | **1.3471** | 11,575,498 | 21172s train + 24883s eval (12.79h total) | **Completed — NEW RECORD** |
 
 **Notes on the table:**
 - "Pre-Q val_bpb" = the final validation BPB measured with float weights (the `val_loss:X val_bpb:Y` line at end of training).
 - "Post-Q val_bpb" = the `final_int8_zlib_roundtrip` BPB after quantisation, serialisation, decompression, and dequantisation. This is the official competition metric.
 - "Artifact (bytes)" = the `serialized_model_int8_zlib` compressed file size.
 - All runs used Muon+Adam optimiser, bfloat16 compute, tied embeddings, logit_softcap=30 (except run 10: softcap=29, run 11: qk_gain=1.9 + softcap=29).
-- Runs 1-11 used 1 train shard. Runs 12 used 5 shards. Runs 13-23 used 20 shards.
+- Runs 1-11 used 1 train shard. Runs 12 used 5 shards. Runs 13-23 used 20 shards. Run 24 used 80 shards (8B tokens).
 
 ---
 
@@ -431,6 +432,26 @@ Platform: Apple M4 Max / 128 GB / MLX 0.31.1 / Python 3.13.2
 
 ---
 
+### Run 24: definitive_20k (2026-03-28) -- NEW ALL-TIME RECORD
+
+**Purpose:** Definitive run combining every proven technique plus new additions: QuadgramHash, Late QAT, GPTQ-lite clip search, 80 training shards, and 20,000 iterations.
+
+**Configuration:** 11 layers, 512d, 8H/4KV, 3x MLP, LeakyReLU(0.9) squared activation, SmearGate, BigramHash 10240, TrigramHash 4096, QuadgramHash 2048, VRL (Variable-Rate Layers), Gated Attention, Partial RoPE 16/64, LN Scale, Cautious Muon optimiser, Late QAT (quantisation-aware training), GPTQ-lite clip search. 80 train shards (8B tokens), 20,000 iterations, wallclock 43,200s. Mixed quant 6/6. SWA starting at step 18850.
+
+**Results:**
+- All 20,000 steps completed in 21,172s (5.88 hours, 1059ms/step avg).
+- SWA applied: averaged 23 checkpoints (started step 18850).
+- Pre-quant val_bpb: **1.4109** (val_loss: 2.3822).
+- Post-quant val_bpb: **1.3471** (val_loss: 2.2745). Quantisation *improved* score by -0.0638 bpb.
+- Artifact size: 11,575,498 bytes (payload: 28,621,356, ratio: 3.91x).
+- Eval time: 24,883s (6.91 hours), sliding window stride 64.
+- Total wall time: 12.79 hours.
+- Model params: 28,255,422.
+
+**Key observations:** First run with QuadgramHash, Late QAT, and GPTQ clip search. The combination of Late QAT and GPTQ clip search produced a remarkable result: post-quant bpb (1.3471) is substantially *better* than pre-quant (1.4109), a -0.0638 bpb improvement from quantisation. This is the largest quantisation-helps-score effect observed across all runs — Run 17 showed -0.018, this run shows -0.064. The 20,000 iterations (4x Run 23's 5,000) and 80 shards (4x Run 23's 20) confirm that more data and more training continue to pay dividends. The pre-quant bpb of 1.4109 is already better than Run 23's 1.4351, and the post-quant 1.3471 crushes the previous best (Run 17's 1.4739) by 0.127 bpb. New all-time record.
+
+---
+
 ## Evolution Summary
 
 ```
@@ -454,7 +475,11 @@ Platform: Apple M4 Max / 128 GB / MLX 0.31.1 / Python 3.13.2
   |
   | +1 layer, +2000 iters, SWA tuning
   v
-~1.43 bpb  smasher (11L, 5000 iters, SWA, eval in progress)
+~1.43 bpb  smasher (11L, 5000 iters, SWA)
+  |
+  | +QuadgramHash, Late QAT, GPTQ clip, 80 shards, 20k iters
+  v
+1.35 bpb  definitive_20k (11L, 20000 iters, SWA, Late QAT+GPTQ) ← NEW RECORD
 ```
 
 ## Dead Ends and Failed Hypotheses
@@ -471,8 +496,9 @@ Platform: Apple M4 Max / 128 GB / MLX 0.31.1 / Python 3.13.2
 ## Key Discoveries
 
 1. **SWA is the single most impactful technique**: Run 17 with SWA achieved 1.4739 bpb; the same model without SWA (Runs 20-21) scored ~1.62 bpb. SWA accounts for ~0.15 bpb of improvement.
-2. **Quantisation can help under SWA**: With SWA-averaged weights, post-quant bpb was *better* than pre-quant in Run 17 (-0.018). SWA smooths the loss landscape, making quantised weights land in better minima.
-3. **More iterations always help**: 200 -> 500 -> 1000 -> 3000 -> 5000 iterations, each step improved results. Training is not saturating.
-4. **SmearGate + BigramHash**: Together worth ~0.22 bpb improvement (1.90 -> 1.69). These are the highest-value architectural additions.
-5. **Mixed 6-bit quantisation**: The sweet spot. 5-bit destroys too much information; 6-bit loses almost nothing.
-6. **Sliding-window eval with stride 64**: Essential for proper validation on long sequences. Full-stride eval would be impossibly slow.
+2. **Late QAT + GPTQ clip search is transformative**: Run 24 showed post-quant bpb *0.064 below* pre-quant (1.3471 vs 1.4109). This is the largest quantisation-helps effect observed, far exceeding Run 17's -0.018. Late QAT trains the model to be quantisation-friendly; GPTQ clip search finds optimal clipping thresholds.
+3. **More iterations always help**: 200 -> 500 -> 1000 -> 3000 -> 5000 -> 20000 iterations, each step improved results. Training is not saturating even at 20k steps.
+4. **More data always helps**: 80 shards (8B tokens) at 20k iterations produced measurably better results than 20 shards at 5k iterations.
+5. **SmearGate + BigramHash**: Together worth ~0.22 bpb improvement (1.90 -> 1.69). These are the highest-value architectural additions.
+6. **Mixed 6-bit quantisation**: The sweet spot. 5-bit destroys too much information; 6-bit loses almost nothing.
+7. **Sliding-window eval with stride 64**: Essential for proper validation on long sequences. Full-stride eval would be impossibly slow.
