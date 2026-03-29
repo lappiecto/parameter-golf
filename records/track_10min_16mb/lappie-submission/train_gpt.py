@@ -760,6 +760,8 @@ class CausalSelfAttention(nn.Module):
         k = torch.cat([k_rope, k[..., rd:]], dim=-1)
 
         q = q * self.q_gain.to(dtype=q.dtype)[None, :, None, None]
+        # Cache v BEFORE expansion for VRL (must stay at num_kv_heads, not num_heads)
+        v_for_cache = v
         # Expand KV heads manually for GQA compatibility on all hardware
         if self.num_kv_heads != self.num_heads:
             repeat_factor = self.num_heads // self.num_kv_heads
@@ -776,7 +778,7 @@ class CausalSelfAttention(nn.Module):
         y = y * gate
 
         y = y.transpose(1, 2).contiguous().reshape(bsz, seqlen, dim)
-        return self.proj(y), v  # return v for VRL caching
+        return self.proj(y), v_for_cache  # return pre-expansion v for VRL
 
 
 # ---------------------------------------------------------------------------
