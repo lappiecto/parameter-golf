@@ -20,6 +20,7 @@ Integrates the following techniques on top of the baseline train_gpt.py:
   - Sliding window eval for final quantised roundtrip
   - Decoupled weight decay in Muon
   - zstd-22 compression for artifact size
+  - Test-Time Training (TTT): per-document backward-looking SGD on scored tokens
 
 Run: torchrun --standalone --nproc_per_node=8 train_gpt.py
 """
@@ -118,6 +119,13 @@ class Hyperparameters:
     # Mixed int6 quantisation
     quant_bits_mlp = int(os.environ.get("QUANT_BITS_MLP", 6))
     quant_bits_attn = int(os.environ.get("QUANT_BITS_ATTN", 6))
+
+    # Test-Time Training (TTT) hyperparameters
+    ttt_enabled = bool(int(os.environ.get("TTT_ENABLED", "0")))
+    ttt_lr = float(os.environ.get("TTT_LR", 1.0))
+    ttt_momentum = float(os.environ.get("TTT_MOMENTUM", 0.9))
+    ttt_epochs = int(os.environ.get("TTT_EPOCHS", 3))
+    ttt_grad_clip = float(os.environ.get("TTT_GRAD_CLIP", 1.0))
 
     # Optimizer hyperparameters
     embed_lr = float(os.environ.get("EMBED_LR", 0.6))
@@ -456,6 +464,228 @@ def eval_val_sliding(
     val_loss = loss_sum / token_count
     bits_per_token = val_loss / math.log(2.0)
     val_bpb = bits_per_token * (token_count / byte_count)
+    return val_loss, val_bpb
+
+
+# -----------------------------------------------------------------------------
+# TEST-TIME TRAINING (Score-First Backward-Looking TTT)
+# -----------------------------------------------------------------------------
+# At eval time we adapt ALL model parameters per-document on already-scored
+# tokens.  The approach:
+#   1.  Slide a window (stride) across each document in the validation set.
+#   2.  For each window, score the last `stride` tokens under inference (no grad).
+#   3.  After scoring, train ALL params on those same tokens with SGD (momentum=0.9,
+#       LR=1.0, ttt_epochs per chunk, cosine decay within each document, grad clip 1.0).
+#   4.  Reset model to the checkpoint between documents.
+
+BOS_ID = 1  # SentencePiece BOS token id
+
+
+def _find_doc_boundaries(tokens: Tensor) -> list[tuple[int, int]]:
+    """Return (start, end) for each document delimited by BOS tokens.
+
+    `end` is exclusive -- tokens[start:end] is the full document including its
+    leading BOS.  The final document extends to the end of the tensor.
+    """
+    bos_positions = (tokens == BOS_ID).nonzero(as_tuple=True)[0]
+    if len(bos_positions) == 0:
+        return [(0, int(tokens.numel()))]
+    docs: list[tuple[int, int]] = []
+    for i in range(len(bos_positions)):
+        start = int(bos_positions[i].item())
+        end = int(bos_positions[i + 1].item()) if i + 1 < len(bos_positions) else int(tokens.numel())
+        if end - start >= 2:
+            docs.append((start, end))
+    return docs
+
+
+def eval_val_sliding_ttt(
+    args: Hyperparameters,
+    model: nn.Module,
+    base_model: nn.Module,
+    device: torch.device,
+    val_tokens: Tensor,
+    base_bytes_lut: Tensor,
+    has_leading_space_lut: Tensor,
+    is_boundary_token_lut: Tensor,
+    stride: int,
+    ttt_lr: float = 1.0,
+    ttt_momentum: float = 0.9,
+    ttt_epochs: int = 3,
+    ttt_grad_clip: float = 1.0,
+    log_fn=None,
+) -> tuple[float, float]:
+    """Sliding window eval with per-document backward-looking test-time training.
+
+    For each document in the validation set:
+      1. Save model weights (the quantised checkpoint).
+      2. Slide a window across the document, scoring the last `stride` tokens
+         (inference only -- this is the BPB contribution).
+      3. After scoring each chunk, train ALL model params on those scored tokens
+         using SGD with momentum for `ttt_epochs` passes.
+      4. Cosine LR decay within each document (chunk index / total chunks).
+      5. After the document ends, restore model weights from the saved checkpoint.
+
+    Returns (val_loss, val_bpb) -- the same signature as eval_val_sliding.
+    """
+    seq_len = args.train_seq_len
+
+    # Need to access underlying model for tied-embedding logit projection
+    raw_model = base_model.module if hasattr(base_model, "module") else base_model
+
+    # -------------------------------------------------------------------------
+    # 1. Identify document boundaries
+    # -------------------------------------------------------------------------
+    docs = _find_doc_boundaries(val_tokens)
+    if log_fn is not None:
+        log_fn(f"ttt:found {len(docs)} documents in validation set")
+
+    # -------------------------------------------------------------------------
+    # 2. Snapshot the base model weights (we restore after each document)
+    # -------------------------------------------------------------------------
+    base_state = {k: v.detach().clone() for k, v in raw_model.state_dict().items()}
+
+    # -------------------------------------------------------------------------
+    # 3. Main loop: iterate over documents
+    # -------------------------------------------------------------------------
+    loss_sum = 0.0
+    token_count = 0.0
+    byte_count = 0.0
+
+    for doc_idx, (doc_start, doc_end) in enumerate(docs):
+        doc_tokens = val_tokens[doc_start:doc_end]
+        doc_len = len(doc_tokens) - 1  # number of prediction positions
+
+        if doc_len < 1:
+            continue
+
+        # Restore model to base checkpoint before each document
+        raw_model.load_state_dict(base_state, strict=True)
+
+        # Initialise SGD optimiser (fresh per document)
+        ttt_optimizer = torch.optim.SGD(
+            raw_model.parameters(), lr=ttt_lr, momentum=ttt_momentum,
+        )
+
+        # Build window start positions for this document
+        window_starts: list[int] = []
+        for ws in range(0, doc_len, stride):
+            if min(ws + seq_len, doc_len) - ws >= 1:
+                window_starts.append(ws)
+        total_chunks = len(window_starts)
+
+        for ci, ws in enumerate(window_starts):
+            end = min(ws + seq_len, doc_len)
+            wlen = end - ws
+
+            # Slice input/target from the document
+            chunk = doc_tokens[ws:end + 1]
+            x_np = chunk[:-1].unsqueeze(0)  # (1, wlen)
+            y_np = chunk[1:].unsqueeze(0)
+
+            # Pad to seq_len if needed
+            if wlen < seq_len:
+                x_padded = torch.zeros(1, seq_len, dtype=torch.int64)
+                y_padded = torch.zeros(1, seq_len, dtype=torch.int64)
+                x_padded[0, :wlen] = x_np[0]
+                y_padded[0, :wlen] = y_np[0]
+                x_np = x_padded
+                y_np = y_padded
+
+            x = x_np.to(device=device, dtype=torch.int64, non_blocking=True)
+            y = y_np.to(device=device, dtype=torch.int64, non_blocking=True)
+
+            # -----------------------------------------------------------------
+            # SCORE: inference-only forward pass -- accumulate BPB
+            # -----------------------------------------------------------------
+            model.eval()
+            with torch.inference_mode():
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+                    # Full forward to get per-token loss
+                    tok_x = raw_model.tok_emb(x)
+                    tok_x = tok_x + raw_model.bigram_embed(x)
+                    tok_x = tok_x + raw_model.trigram_embed(x)
+                    if raw_model.quadgram_embed is not None:
+                        tok_x = tok_x + raw_model.quadgram_embed(x)
+                    if raw_model.smear_gate is not None:
+                        tok_x = raw_model.smear_gate(tok_x)
+                    tok_x = F.rms_norm(tok_x, (tok_x.size(-1),))
+                    x0 = tok_x
+                    skips = []
+                    v0_cached = None
+                    for i in range(raw_model.num_encoder_layers):
+                        tok_x, v_out = raw_model.blocks[i](tok_x, x0, v0=v0_cached if i > 0 else None)
+                        if i == 0:
+                            v0_cached = v_out
+                        skips.append(tok_x)
+                    for i in range(raw_model.num_decoder_layers):
+                        if skips:
+                            tok_x = tok_x + raw_model.skip_weights[i].to(dtype=tok_x.dtype)[None, None, :] * skips.pop()
+                        tok_x, _ = raw_model.blocks[raw_model.num_encoder_layers + i](tok_x, x0, v0=v0_cached)
+                    hidden = raw_model.final_norm(tok_x).reshape(-1, tok_x.size(-1))
+
+                    if raw_model.tie_embeddings:
+                        logits_proj = F.linear(hidden, raw_model.tok_emb.weight)
+                    else:
+                        logits_proj = raw_model.lm_head(hidden)
+                    logits = raw_model.logit_softcap * torch.tanh(logits_proj / raw_model.logit_softcap)
+
+                    per_token_loss = F.cross_entropy(
+                        logits.float(), y.reshape(-1), reduction="none"
+                    )
+
+                nll = per_token_loss.detach().cpu().to(torch.float64)
+
+            # Score only the last `stride` tokens (or all for the first window)
+            s = 0 if ws == 0 else max(wlen - stride, 0)
+            scored_nll = nll[s:wlen]
+            loss_sum += float(scored_nll.sum().item())
+            token_count += float(wlen - s)
+
+            # Byte counting for BPB
+            y_flat = y.reshape(-1).cpu()
+            x_flat = x.reshape(-1).cpu()
+            tgt = y_flat[s:wlen]
+            prev = x_flat[s:wlen]
+            tb = base_bytes_lut.cpu()[tgt].to(torch.float64)
+            tb += (has_leading_space_lut.cpu()[tgt] & ~is_boundary_token_lut.cpu()[prev]).to(torch.float64)
+            byte_count += float(tb.sum().item())
+
+            # -----------------------------------------------------------------
+            # TRAIN: backward-looking SGD on the already-scored chunk
+            # -----------------------------------------------------------------
+            # Cosine LR decay within this document
+            progress = ci / max(total_chunks - 1, 1)
+            cos_lr = ttt_lr * 0.5 * (1.0 + math.cos(math.pi * progress))
+            for pg in ttt_optimizer.param_groups:
+                pg["lr"] = cos_lr
+
+            model.train()
+            for _epoch in range(ttt_epochs):
+                ttt_optimizer.zero_grad(set_to_none=True)
+                with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=True):
+                    ttt_loss = raw_model(x, y)
+                ttt_loss.backward()
+                if ttt_grad_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(raw_model.parameters(), ttt_grad_clip)
+                ttt_optimizer.step()
+
+        if log_fn is not None and (doc_idx % 50 == 0 or doc_idx == len(docs) - 1):
+            running_loss = loss_sum / max(token_count, 1)
+            running_bpb = (running_loss / math.log(2.0)) * (token_count / max(byte_count, 1))
+            log_fn(
+                f"ttt_progress:doc {doc_idx + 1}/{len(docs)} "
+                f"running_loss:{running_loss:.4f} running_bpb:{running_bpb:.4f}"
+            )
+
+    # -------------------------------------------------------------------------
+    # 4. Restore model to base state (leave it unchanged from caller's POV)
+    # -------------------------------------------------------------------------
+    raw_model.load_state_dict(base_state, strict=True)
+
+    val_loss = loss_sum / max(token_count, 1)
+    bits_per_token = val_loss / math.log(2.0)
+    val_bpb = bits_per_token * (token_count / max(byte_count, 1))
     return val_loss, val_bpb
 
 
@@ -1426,6 +1656,10 @@ def main() -> None:
     log0(f"qat_enabled:{args.qat_enabled} qat_lr_threshold:{args.qat_lr_threshold}")
     log0(f"quant_bits_mlp:{args.quant_bits_mlp} quant_bits_attn:{args.quant_bits_attn}")
     log0(f"eval_stride:{args.eval_stride}")
+    log0(
+        f"ttt_enabled:{args.ttt_enabled} ttt_lr:{args.ttt_lr} ttt_momentum:{args.ttt_momentum} "
+        f"ttt_epochs:{args.ttt_epochs} ttt_grad_clip:{args.ttt_grad_clip}"
+    )
     log0(f"seed:{args.seed}")
 
     # -------------------------------------------------------------------------
@@ -1693,7 +1927,29 @@ def main() -> None:
     t_qeval = time.perf_counter()
 
     # Use sliding window eval for final quantised roundtrip if eval_stride > 0
-    if args.eval_stride > 0:
+    # When TTT_ENABLED=1, use test-time training variant for the final eval
+    if args.ttt_enabled and args.eval_stride > 0:
+        log0(
+            f"ttt:enabled lr:{args.ttt_lr} momentum:{args.ttt_momentum} "
+            f"epochs:{args.ttt_epochs} grad_clip:{args.ttt_grad_clip}"
+        )
+        q_val_loss, q_val_bpb = eval_val_sliding_ttt(
+            args,
+            model,
+            base_model,
+            device,
+            val_tokens,
+            base_bytes_lut,
+            has_leading_space_lut,
+            is_boundary_token_lut,
+            stride=args.eval_stride,
+            ttt_lr=args.ttt_lr,
+            ttt_momentum=args.ttt_momentum,
+            ttt_epochs=args.ttt_epochs,
+            ttt_grad_clip=args.ttt_grad_clip,
+            log_fn=log0,
+        )
+    elif args.eval_stride > 0:
         q_val_loss, q_val_bpb = eval_val_sliding(
             args,
             model,
